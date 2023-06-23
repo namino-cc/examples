@@ -85,9 +85,9 @@ void loop() {
   
   // The industrial side NAMINO board performs some initializations, if the board has finished the initialization and is ready this function returns true
   if (na.isReady() && na.readNTC() < setPoint) {
-   na.writeRele(true);
+   na.writeRele(true);  // Relay status setting. 
   } else {
-   na.writeRele(false);
+   na.writeRele(false);  // Relay status setting. 
   }
 
   na.showRegister();    // debug function
