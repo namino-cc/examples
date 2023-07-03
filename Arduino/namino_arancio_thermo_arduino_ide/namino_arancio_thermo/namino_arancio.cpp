@@ -1,7 +1,7 @@
 /*
 MIT License
 
-Copyright (c) 2023 Namino Team, version: 1.0.16 @ 2023-06-23
+Copyright (c) 2023 Namino Team, version: 1.0.17 @ 2023-06-30
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -179,11 +179,13 @@ bool namino_arancio::isReady() {
 void namino_arancio::resetEncoderCounter() {
     reg[WR_ENCODER_SET_L] = 0;
     reg[WR_ENCODER_SET_H] = 0;
+    reg[WR_CONFIG_REGISTER] = 1;
 }
 
 void namino_arancio::setEncoderCounter(int32_t value) {
     reg[WR_ENCODER_SET_L] = value & 0x0000FFFF;
     reg[WR_ENCODER_SET_H] = (value & 0xFFFF0000) >> 16;
+    reg[WR_CONFIG_REGISTER] = 1;
 }
 
 bool namino_arancio::readDigIn(int channel) {

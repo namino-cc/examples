@@ -1,6 +1,6 @@
 /* namino rosso thermo regulator sample
 
-Copyright (c) 2023 Namino Team, version: 1.0.15 @ 2023-06-14
+Copyright (c) 2023 Namino Team, version: 1.0.17 @ 2023-06-30
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

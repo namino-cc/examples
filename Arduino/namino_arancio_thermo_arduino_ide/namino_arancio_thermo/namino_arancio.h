@@ -1,7 +1,7 @@
 /*
 MIT License
 
-Copyright (c) 2023 Namino Team, version: 1.0.16 @ 2023-06-23
+Copyright (c) 2023 Namino Team, version: 1.0.17 @ 2023-06-30
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -85,7 +85,7 @@ typedef enum {
   WR_RESERVED_50          = WR_FIRST_INDEX + 18,  // 50
   WR_ANALOG_OUT_CH01_CONF = WR_FIRST_INDEX + 19,  // 51
   WR_COUNTER              = WR_FIRST_INDEX + 20,  // 52
-  WR_RESERVED_53          = 53,
+  WR_CONFIG_REGISTER      = WR_FIRST_INDEX + 21,  // 53
   WR_RESERVED_54          = 54,
   WR_RESERVED_55          = 55,
   WR_RESERVED_56          = 56,
