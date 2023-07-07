@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2023 Namino Team, version: 1.0.17 @ 2023-06-30
+// Copyright (c) 2023 Namino Team, version: 1.0.18 @ 2023-07-07
 //
 //
 #include <stdint.h>

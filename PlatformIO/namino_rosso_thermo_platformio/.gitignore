@@ -1,1 +1,11 @@
 .pio
+.pioenvs
+.travis.yml
+cscope.out
+tags
+vimHighlightFile.vim
+doc
+*.pyc
+*.vimc
+Doxygen
+.vscode

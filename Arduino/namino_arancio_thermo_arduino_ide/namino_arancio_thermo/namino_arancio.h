@@ -1,7 +1,7 @@
 /*
 MIT License
 
-Copyright (c) 2023 Namino Team, version: 1.0.17 @ 2023-06-30
+Copyright (c) 2023 Namino Team, version: 1.0.18 @ 2023-07-07
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -158,6 +158,18 @@ public:
      * read namino arancio life time
      */
     uint32_t readLifeTime();
+
+    /**
+     * firmware version
+     * @return signal board firmware version
+     */
+    uint16_t fwVersion();
+
+    /**
+     * board code identifier
+     * @return identifier values 0x1338=rosso, 0x2904=arancio, ...
+     */
+    uint16_t boardType();
 
     /**
      * analog section is ready for configuration ?

@@ -1,7 +1,7 @@
 /*
 MIT License
 
-Copyright (c) 2023 Namino Team, version: 1.0.17 @ 2023-06-30
+Copyright (c) 2023 Namino Team, version: 1.0.18 @ 2023-07-07
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -322,6 +322,14 @@ int32_t namino_rosso::readEncoder() {
 
 uint32_t namino_rosso::readLifeTime() {
     return (reg[RO_LIFE_TIME_H] << 16) | reg[RO_LIFE_TIME_L];
+}
+
+uint16_t namino_rosso::fwVersion() {
+  return (reg[RO_NAMINO_ID]);
+}
+
+uint16_t namino_rosso::boardType() {
+  return (reg[RO_ANALOG_FRONT_END_ID]);
 }
 
 bool namino_rosso::isReady() {

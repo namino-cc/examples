@@ -1,7 +1,7 @@
 /*
 MIT License
 
-Copyright (c) 2023 Namino Team, version: 1.0.17 @ 2023-06-30
+Copyright (c) 2023 Namino Team, version: 1.0.18 @ 2023-07-07
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -182,6 +182,7 @@ typedef enum {
   OUT_CH01_VOLTAGE     = 2,
 } ANALOG_OUT_CH01_CONF_VALUES;
 
+/// @brief 
 class namino_rosso {
 public:
     namino_rosso();
@@ -211,6 +212,18 @@ public:
      * read namino rosso life time
      */
     uint32_t readLifeTime();
+
+    /**
+     * firmware version
+     * @return signal board firmware version
+     */
+    uint16_t fwVersion();
+
+    /**
+     * board code identifier
+     * @return identifier values 0x1338=rosso, 0x2904=arancio, ...
+     */
+    uint16_t boardType();
 
     /**
      * analog section is ready for configuration ?
@@ -295,6 +308,7 @@ public:
 
     /**
      * read namino rosso board temperature
+     * @return celsius temperature
      */
     float_t tBoard();
 

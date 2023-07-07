@@ -1,6 +1,6 @@
 /* namino rosso thermo regulator sample
 
-Copyright (c) 2023 Namino Team, version: 1.0.17 @ 2023-06-30
+Copyright (c) 2023 Namino Team, version: 1.0.18 @ 2023-07-07
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -81,6 +81,7 @@ void loop() {
     nr.writeRegister(WR_ANALOG_OUT_CH01_CONF, ANALOG_OUT_CH01_CONF_VALUES::OUT_CH01_VOLTAGE);
     nr.writeAnalogOut(0.0); // output voltage
     Serial.println("AN OUT: config completed");
+    Serial.printf("fwVersion: 0x%04x boardType: 0x%04x\n", nr.fwVersion(), nr.boardType());
   }
   
   // The industrial side NAMINO board performs some initializations, if the board has finished the initialization and is ready this function returns true
