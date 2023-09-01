@@ -5,6 +5,7 @@
 // See ReadMe.md for details
 //---------------------------------------
 
+#include <Arduino.h>
 #include <LiquidCrystal.h>
 
 #define BLINK_ON    5000            // seconds of cursor blink
@@ -17,7 +18,7 @@ const int D4 = 16;                  // D4 Pin on Shield PD4 on namino
 const int D5 = 21;                  // D5 Pin on Shield PD5 on namino
 const int D6 = 42;                  // D5 Pin on Shield PD6 on namino
 const int D7 = 41;                  // D5 Pin on Shield PD7 on namino
-const int BL = 38;                  // D10 Pin on Shield PD7 on namino
+const int BL = 38;                  // D10 Pin on Shield PB2 on namino
 
 //Define LCD Size
 const int lcdRows = 2;              //  2 Rows
@@ -60,7 +61,8 @@ void setup() {
   pinMode(D7, OUTPUT);
   pinMode(BL, OUTPUT);
   // Set Keys pin as input
-  pinMode(keyPin, INPUT);
+  // pinMode(keyPin, INPUT);
+  pinMode(keyPin, ANALOG);
   // LCD Setup
   lcd.begin(lcdCols, lcdRows);
   lcd.noCursor();
