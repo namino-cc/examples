@@ -1,6 +1,6 @@
 /* namino rosso thermo regulator sample
 
-Copyright (c) 2023 Namino Team, version: 1.0.18 @ 2023-07-07
+Copyright (c) 2023 Namino Team, version: 1.0.19 @ 2023-09-11
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -21,12 +21,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-/* NB, use profile: adafruit_feather_esp32s3_reversetft */
-
 #include <Arduino.h>
 #include <SPI.h>
 
-#include "./namino_rosso.h"
+#include <namino_rosso.h>
 
 #ifdef NAMINO_ROSSO_BOARD
 #undef NAMINO_ROSSO_BOARD
