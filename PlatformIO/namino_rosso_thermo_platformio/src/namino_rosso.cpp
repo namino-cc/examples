@@ -22,7 +22,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-#include "./namino_rosso.h"
+#include "namino_rosso.h"
 #include <Arduino.h>
 #include <stdlib.h>
 #include <stdio.h>

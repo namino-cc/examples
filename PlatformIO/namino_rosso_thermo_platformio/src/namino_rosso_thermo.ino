@@ -26,7 +26,7 @@ SOFTWARE.
 #include <Arduino.h>
 #include <SPI.h>
 
-#include "./namino_rosso.h"
+#include "namino_rosso.h"
 
 #ifdef NAMINO_ROSSO_BOARD
 #undef NAMINO_ROSSO_BOARD

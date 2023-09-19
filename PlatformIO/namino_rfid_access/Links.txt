@@ -1,0 +1,3 @@
+https://esp32io.com/tutorials/esp32-rfid-nfc
+https://www.electronicwings.com/esp32/rfid-rc522-interfacing-with-esp32
+
