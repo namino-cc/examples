@@ -107,19 +107,18 @@ int readKeyboard()
   lcd.setCursor(0,1);
   lcd.write(buff);
   
-  if (adc_key_in <= 500)            // On my test board mapped as  0
+  if (adc_key_in <= 100)            // On my test board mapped as  0
     retValue = btnRIGHT;
-  else if (adc_key_in < 1000)       // On my test board mapped about as  776
+  else if (adc_key_in <  800)       // On my test board mapped about as  490
     retValue = btnUP;  
-  else if (adc_key_in < 2000)       // On my test board mapped about as  1860
+  else if (adc_key_in < 1500)       // On my test board mapped about as  1230
     retValue = btnDOWN; 
-  else if (adc_key_in < 4000)       // On my test board mapped about as  2930
+  else if (adc_key_in < 2200)       // On my test board mapped about as  1830
     retValue = btnLEFT; 
-  else if (adc_key_in >= 4000)      // On my test board mapped as  4095
+  else if (adc_key_in < 3500)       // On my test board mapped about as  2780
+    retValue = btnSELECT; 
+  else                              // On my test board mapped as  4095
     retValue = btnNONE; 
-  else 
-    // At the moment the button Select seems not working....
-    retValue = btnSELECT;  
   // almost one key is pressed 
   if (retValue != btnNONE)  {
     lastKeyTouch = millis();
