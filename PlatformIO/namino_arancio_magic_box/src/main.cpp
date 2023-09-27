@@ -1,19 +1,13 @@
-#include <namino_arancio.h>
-#include <SPI.h>
+#include "namino_arancio.h"
 #include <Wire.h>
 #include <MFRC522.h>
+
+
 
 #ifdef NAMINO_ROSSO_BOARD
 #undef NAMINO_ROSSO_BOARD
 #endif
 
-#define LOOP_PERIOD   500           // 500ms loop period
-#define LINE_LEN    20              // Line Buffer Size
-
-// Namino Arancio interface instance
-// namino_arancio nr = namino_arancio();
-
-// Tag Reader Pins
 #define CS_PIN   16
 #define RST_PIN  18
 #define SCK_PIN  14
@@ -23,15 +17,19 @@
 MFRC522 mfrc522(CS_PIN, RST_PIN);   // Create MFRC522 instance.
 MFRC522::MIFARE_Key key;
 
-// Loop Params
+// Loop interval
+#define LOOP_PERIOD   500           // 500ms loop period
+#define LINE_LEN    20              // Line Buffer Size
+
 unsigned long lastTagdRead = 0;
 unsigned long lastLoop = 0;
 bool          readerOk = false;
 
+
 void setup() {
   // put your setup code here, to run once:
   Serial.begin(115200);
-  while (!Serial);
+  delay(2000);
   Serial.println("");
   Serial.println("=====================================");
   Serial.println("##      RFID MAGIC BOX EXAMPLE     ##");
@@ -50,26 +48,7 @@ void setup() {
   Serial.println("-------------------");
   Serial.flush();
   delay(2000);
-  // TODO: Start Mamino Industrial Interface
-  // Namino Industrial Interface start
-  // Serial.println("Namino Arancio Interface starting");
-  // reset namino microcontroller. Industrial side board reset.
-  // nr.resetSignalMicroprocessor();
-  // Openin communication of the industrial side interface
-  // nr.begin(800000U, MISO, MOSI, SCK, SS);
-  // delay(2000);
-  // nr.readAllRegister();
 
-  // while (not nr.isReady())  {
-  //    delay(200);
-  //    Serial.print(".");
-  // }
-  // Serial.println("\nNamino Rosso Interface started!");
-  // MFRC522 Setup
-  // Wire.begin();
-  // disable on SPI bus
-  // pinMode(NM_SS, OUTPUT);
-  // digitalWrite(NM_SS, HIGH);
 
   // Starting custom SPI
   Serial.println("Starting SPI Interface");
@@ -93,7 +72,6 @@ void setup() {
   else  {
     Serial.println("Error in Reader Self Test");
   }
-
 }
 
 void loop() {
@@ -144,3 +122,4 @@ void loop() {
     Serial.println("No Reader Found!");
   }
 }
+
