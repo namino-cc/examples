@@ -1,5 +1,5 @@
 /*
-  namino_libra, 0-100kg digital scale
+  namino_libra, 0-5 kg digital double scale + win indicator
 
   display: 
   https://www.maffucci.it/2021/02/08/arduino-utilizzo-delllcd1602-keypad-shield-della-keyestudio/
@@ -8,6 +8,11 @@
 */
 
 // include the library code
+#include "namino_rosso.h"
+
+#ifdef NAMINO_ROSSO_BOARD
+#undef NAMINO_ROSSO_BOARD
+#endif
 
 #include <LiquidCrystal.h>
 
@@ -35,6 +40,7 @@ float weightLeft = 0;
 float weightLeftBias = 0;
 float weightRight = 0;
 float weightRightBias = 0;
+float weightTol = 0.005;
 
 #define LCD_HOME(r)                 lcd.setCursor(0,r);
 #define ABS(x)                      ((x)>0?(x):-(x))
@@ -43,10 +49,28 @@ float weightRightBias = 0;
 #define WEIGHT_NET_R                ABS(weightRight - weightRightBias)    
 
 unsigned long lastTiming = millis();
+bool indicator = false;
+
+namino_rosso nr = namino_rosso();
 
 void setup() {
+  Serial.begin(115200);
+  delay(500);  // mandatory delay
 
- // set Pins as Output
+  // reset namino microcontroller. Industrial side board reset.
+  nr.resetSignalMicroprocessor();
+
+  // Opening/closing of communication / initialization of the industrial side interface
+  nr.begin(800000U, MISO, MOSI, SCK, SS);
+
+  Serial.println();
+  Serial.println("=========================================");
+  Serial.println("##    NAMINO ROSSO LIBRA SAMPLE CODE   ##");
+  Serial.println("=========================================");
+  Serial.println();
+  delay(2000);
+
+  // set Pins as Output
 
   pinMode(RS, OUTPUT);
   pinMode(EN, OUTPUT);
@@ -128,12 +152,19 @@ void displayMeasure() {
   lcd.print(buf);
 
   LCD_HOME(1);
-  if (WEIGHT_NET_L < WEIGHT_NET_R) {
-    sprintf(buf, "%+5.2f kg ------>", ABS(WEIGHT_NET_R - WEIGHT_NET_L));
+  float delta = ABS(WEIGHT_NET_R - WEIGHT_NET_L);
+  if (delta < weightTol) {
+    sprintf(buf, "HAI VINTO HAI VINTO!");
+    indicator = true;
+  } else if (WEIGHT_NET_L < WEIGHT_NET_R) {
+    sprintf(buf, "%+5.2f kg ------>", delta);
+    indicator = false;
   } else if (WEIGHT_NET_L > WEIGHT_NET_R) {
-    sprintf(buf, "<------ %+5.2f kg  ", ABS(WEIGHT_NET_R - WEIGHT_NET_L));
+    sprintf(buf, "<------ %+5.2f kg  ", delta);
+    indicator = false;
   } else {
-    sprintf(buf, "================");
+    sprintf(buf, " * SUPER VINCITA *  ");
+    indicator = true;
   }
   lcd.print(buf);
 }
@@ -155,20 +186,22 @@ char decodeButton(int button_v) {
   return ' ';
 }
 
+bool configAN = true;
+unsigned long msAN = millis();
+#define AN_INIT_DELAY_MS      (5 * 1000)
+
 void loop() {
   char buf[20+1];
 
+  // In the loop() there must be the following functions, which allow the exchange of values with the industrial side board
+  nr.readAllRegister();
+
   int button_v = analogRead(GPIO_NUM_3);
   // debug analog keyboard
-  // sprintf(buf, "V: %d %c   ", button_v, decodeButton(button_v));
+  sprintf(buf, "V: %d %c   ", button_v, decodeButton(button_v));
   // LCD_HOME(0);
   // lcd.print(buf);
-
-  if (decodeButton(button_v) == 'S') {
-    weightLeft = readWeightL();
-    weightRight = readWeightR();
-    lastTiming = millis();
-  }
+  Serial.println(buf);
 
   if (millis() - lastTiming > 1000 * 30) {
     displayBanner();
@@ -176,4 +209,37 @@ void loop() {
   } else {
     displayMeasure();
   }
+
+  if (decodeButton(button_v) == 'S') {
+    weightLeft = readWeightL();
+    weightRight = readWeightR();
+    lastTiming = millis();
+  } else if (decodeButton(button_v) == 'U') {
+    // lamp test on
+    Serial.println("lamp test on");
+    indicator = true;
+  } else if (decodeButton(button_v) == 'D') {
+    // lamp test off
+    Serial.println("lamp test off");
+    indicator = false;
+  }
+  nr.writeDigOut(1, indicator);
+
+  // AN delay configuration
+  // To set the configuration, in the loop inside an if there must be all the initial analog configurations, after having waited for the industrial side to start,
+  if (configAN && nr.isReady() && (millis() - msAN > AN_INIT_DELAY_MS)) {
+    configAN = false;
+    nr.writeRegister(WR_ANALOG_IN_CH01_CONF, ANALOG_IN_CH01_CONF_VALUES::CH01_LOAD_CELL);
+    nr.writeRegister(WR_ANALOG_IN_CH03_CONF, ANALOG_IN_CH03_CONF_VALUES::CH03_LOAD_CELL);
+
+    Serial.printf("fwVersion: 0x%04x boardType: 0x%04x\n", nr.fwVersion(), nr.boardType());
+  }
+
+  // Serial.printf("RO_ANALOG_IN_CH01 %d\n", nr.loadRegister(RO_ANALOG_IN_CH01));
+  // Serial.printf("RO_ANALOG_IN_CH02 %d\n", nr.loadRegister(RO_ANALOG_IN_CH02));
+
+  // In the loop() there must be the following function, which allow the exchange of values with the industrial side board
+  nr.writeAllRegister();
+
+  delay(500);  
 }
