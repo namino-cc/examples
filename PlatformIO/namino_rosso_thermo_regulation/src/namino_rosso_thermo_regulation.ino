@@ -182,7 +182,6 @@ void loop() {
   uint16_t cpot = analogRead(ADC1_CH3);         // PIN 4 on board mark
   float vpot = cpot * (3.3 / 4096.0);
   float tpot = mapf(cpot, 0, 4096, 20, 60);
-  Serial.printf("vpot: %f V T set: %f C\n", vpot, tpot);
   setPoint = tpot;
 
   // In the loop() there must be the following functions, which allow the exchange of values with the industrial side board
@@ -201,7 +200,8 @@ void loop() {
   if (nr.isReady()) {
     // Reading converted to reference units by the channel with a connected thermocouple and/or thermometric probe.
     float_t tc = nr.readPt1000(1);
-    Serial.printf("readPt1000(1) %f RO_ANALOG_IN_CH01 %d setPoint %f\n", tc, nr.loadRegister(RO_ANALOG_IN_CH01), setPoint);
+    // Serial.printf("readPt1000(1) %f RO_ANALOG_IN_CH01 %d setPoint %f\n", tc, nr.loadRegister(RO_ANALOG_IN_CH01), setPoint);
+    Serial.printf("vpot: %f V | T set: %f C | T get: %f C\n", vpot, setPoint, tc);
     if (tc < setPoint) {
       nr.writeRele(true);  // Relay status setting.
     } else {
@@ -213,10 +213,10 @@ void loop() {
   // // In the loop() there must be the following function, which allow the exchange of values with the industrial side board
   nr.writeAllRegister();  
 
-  Serial.printf("RO_NAMINO_ID   %d\n", nr.loadRegister(RO_NAMINO_ID));
-  Serial.printf("RO_LIFE_TIME_L %d\n", nr.loadRegister(RO_LIFE_TIME_L));
-  Serial.printf("RO_LIFE_TIME_H %d\n", nr.loadRegister(RO_LIFE_TIME_H));
-  Serial.printf("RO_ANALOG_IN_CH01 %d\n", nr.loadRegister(RO_ANALOG_IN_CH01));
+  // Serial.printf("RO_NAMINO_ID   %d\n", nr.loadRegister(RO_NAMINO_ID));
+  // Serial.printf("RO_LIFE_TIME_L %d\n", nr.loadRegister(RO_LIFE_TIME_L));
+  // Serial.printf("RO_LIFE_TIME_H %d\n", nr.loadRegister(RO_LIFE_TIME_H));
+  // Serial.printf("RO_ANALOG_IN_CH01 %d\n", nr.loadRegister(RO_ANALOG_IN_CH01));
 
   delay(500);
 }
