@@ -227,7 +227,7 @@ float_t namino_rosso::readAnalogIn(int channel) {
                   return value / 10.0; // place here um conversion
                 break;
                 case CH05_LOAD_CELL:
-                  return value; // place here um conversion
+                  return value; // place here um conversio
                 break;
                 default:
                   return 0;

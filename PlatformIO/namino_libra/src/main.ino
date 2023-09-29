@@ -36,20 +36,29 @@ const int lcdCols = 16;                 // 16 Columns
 LiquidCrystal lcd(RS, EN, D4, D5, D6, D7);
 
 // load cell values
-float weightLeft = 0;
-float weightLeftBias = 0;
-float weightRight = 0;
-float weightRightBias = 0;
-float weightTol = 0.005;
-
 #define LCD_HOME(r)                 lcd.setCursor(0,r);
-#define ABS(x)                      ((x)>0?(x):-(x))
+#define ABS(x)                      ((x)>0.0?(x):-(x))
 #define FULL_SCALE                  (5)      
-#define WEIGHT_NET_L                ABS(weightLeft - weightLeftBias)
-#define WEIGHT_NET_R                ABS(weightRight - weightRightBias)    
+#define WEIGHT_NET_L                (ABS(weightLeftM - weightLeftBias) * weightLeftRamp)
+#define WEIGHT_NET_R                (ABS(weightRightM - weightRightBias) * weightRightRamp)
+#define AUTOZERO_COUNT_MAX          (200)
+
+float weightLeftM = 0;
+float weightLeftBias = 0;
+float weightLeftRamp = 372.0 / 2.85;
+float weightRightM = 0;
+float weightRightBias = 0;
+float weightRightRamp = 372.0 / 2.85; // float weightRightRamp = 372.0 / 1.85; mect cal weight
+float weightTol = 150.0;
+int   autozeroCount = AUTOZERO_COUNT_MAX;
+bool  winLock = false;
 
 unsigned long lastTiming = millis();
-bool indicator = false;
+unsigned long lastDisplayTiming = millis();
+bool          indicator = false;
+bool          configAN = true;
+unsigned long msAN = millis();
+char          buf[64];
 
 namino_rosso nr = namino_rosso();
 
@@ -86,12 +95,10 @@ void setup() {
   lcd.begin(lcdRows, lcdCols);     //Initialise the LCD to the correct size
   
   displayBanner();
-  autozero();
   lcd.clear();
 
-  // random weights
-  weightLeft = readWeightL();
-  weightRight = readWeightR();
+  autozeroCount = AUTOZERO_COUNT_MAX;
+  weightLeftM = weightRightM = 0;
 }
 
 void displayBanner() {
@@ -107,66 +114,91 @@ void displayBanner() {
   lcd.clear();
 }
 
-float readWeightL() {
-  float n = random();
-  float d = random();
-  float w;
-
-  if (d == 0) { d = 1; }
-
-  w = ABS(n / d);
-  if (w > FULL_SCALE) { w = FULL_SCALE; }
-  return w; 
-}
-
-float readWeightR() {
-  float n = random();
-  float d = random();
-  float w;
-
-  if (d == 0) { d = 1; }
-
-  w = ABS(n / d);
-  if (w > FULL_SCALE) { w = FULL_SCALE; }
-  return w; 
-}
-
 void autozero() {
-  LCD_HOME(1);
-  lcd.print("   auto  zero   ");
-
-  for (uint8_t i = 0; i < 20; i++) {
-    // TODO
+  if (nr.isReady()) {
+    if (autozeroCount >= 2) {
+      LCD_HOME(1);
+      sprintf(buf, "  auto zero %d  ", autozeroCount);
+      lcd.print(buf);
+      weightLeftM = (nr.readLoadCell(1) + weightLeftM) / AUTOZERO_COUNT_MAX;
+      weightRightM = (nr.readLoadCell(2) + weightRightM) / AUTOZERO_COUNT_MAX;
+      sprintf(buf, "(1) #%d LM %5.2f RM %5.2f", autozeroCount, weightLeftM, weightRightM);
+      Serial.println(buf);
+    } else if (autozeroCount == 1) {
+      weightLeftBias = weightLeftM;
+      weightRightBias = weightRightM;
+      weightLeftM = weightRightM = 0;
+      sprintf(buf, "(2) #%d BL %5.2f BR %5.2f", autozeroCount, weightLeftBias, weightRightBias);
+      Serial.println(buf);
+      lcd.clear();
+      autozeroCount = 0;
+    }
+    if (autozeroCount >= 2 && weightLeftM > 0 && weightRightM > 0) {
+    // the first, 3, readings are at zero
+      if (--autozeroCount < 0 ) { autozeroCount = 0; }
   }
-
-  weightLeftBias = readWeightL();
-  weightRightBias = readWeightR();
-  lcd.clear();
+  }
 }
+
+void weightMeasure() {
+  if (nr.isReady() && autozeroCount == 0) {
+      weightLeftM = (nr.readLoadCell(1) + weightLeftM) / AUTOZERO_COUNT_MAX;
+      weightRightM = (nr.readLoadCell(2) + weightRightM) / AUTOZERO_COUNT_MAX;
+  }
+}
+
+// void weightMeasure() {
+//   if (nr.isReady() && autozeroCount == 0) {
+//       rawValueL = nr.loadRegister(RO_ANALOG_IN_CH01);
+//       rawValueR = nr.loadRegister(RO_ANALOG_IN_CH05);
+//       // weightLeft = nr.readLoadCell(1);
+//       // weightRight = nr.readLoadCell(2);
+
+//       if (rawValueL >= 32768) {
+//         Serial.println("L 1");
+//         weightLeft = rawValueL - 65536;
+//       } else {
+//         Serial.println("L 2");
+//         weightLeft = rawValueL;
+//       }
+//       if (rawValueR >= 32768) {
+//         Serial.println("R 1");
+//         weightRight = rawValueR - 65536;
+//       } else {
+//         Serial.println("R 2");
+//         weightRight = rawValueR;
+//       }
+//   }
+// }
 
 void displayMeasure() {
-  char buf[32];
+  if (nr.isReady() && autozeroCount == 0 && !winLock) {
+    LCD_HOME(0);
+    sprintf(buf, "<L%5.0f %5.0f R>", WEIGHT_NET_L, WEIGHT_NET_R);
+    lcd.print(buf);
 
-  LCD_HOME(0);
-  sprintf(buf, "<L%5.2f %5.2f R>", WEIGHT_NET_L, WEIGHT_NET_R);
-  lcd.print(buf);
+    sprintf(buf, "MLT %5.2f MRT %5.2f", WEIGHT_NET_L, WEIGHT_NET_R);
+    Serial.println(buf); // debug
 
-  LCD_HOME(1);
-  float delta = ABS(WEIGHT_NET_R - WEIGHT_NET_L);
-  if (delta < weightTol) {
-    sprintf(buf, "HAI VINTO HAI VINTO!");
-    indicator = true;
-  } else if (WEIGHT_NET_L < WEIGHT_NET_R) {
-    sprintf(buf, "%+5.2f kg ------>", delta);
-    indicator = false;
-  } else if (WEIGHT_NET_L > WEIGHT_NET_R) {
-    sprintf(buf, "<------ %+5.2f kg  ", delta);
-    indicator = false;
+    LCD_HOME(1);
+    float delta = ABS(WEIGHT_NET_R - WEIGHT_NET_L);
+    if (delta < weightTol && (WEIGHT_NET_L > 50 && WEIGHT_NET_R > 50)) {
+      sprintf(buf, " HAI VINTO VINTO! ");
+      indicator = true;
+      winLock = true;
+    } else if (WEIGHT_NET_L < WEIGHT_NET_R) {
+      sprintf(buf, "%+5.0f g ------->", delta);
+      indicator = false;
+    } else if (WEIGHT_NET_L > WEIGHT_NET_R) {
+      sprintf(buf, "<------- %+5.0f g  ", delta);
+      indicator = false;
+    } else {
+      // nothing
+    }
+    lcd.print(buf);
   } else {
-    sprintf(buf, " * SUPER VINCITA *  ");
-    indicator = true;
+    // not ready, no zero calculated
   }
-  lcd.print(buf);
 }
 
 char decodeButton(int button_v) {
@@ -186,33 +218,32 @@ char decodeButton(int button_v) {
   return ' ';
 }
 
-bool configAN = true;
-unsigned long msAN = millis();
-#define AN_INIT_DELAY_MS      (5 * 1000)
-
 void loop() {
-  char buf[20+1];
 
   // In the loop() there must be the following functions, which allow the exchange of values with the industrial side board
   nr.readAllRegister();
 
-  int button_v = analogRead(GPIO_NUM_3);
-  // debug analog keyboard
-  sprintf(buf, "V: %d %c   ", button_v, decodeButton(button_v));
-  // LCD_HOME(0);
-  // lcd.print(buf);
-  Serial.println(buf);
+  // To set the configuration, in the loop inside an if there must be all the initial analog configurations, after having waited for the industrial side to start,
+  if (configAN && nr.isReady()) {
+    configAN = false;
+    nr.writeRegister(WR_ANALOG_IN_CH01_CONF, ANALOG_IN_CH01_CONF_VALUES::CH01_LOAD_CELL);
+    nr.writeRegister(WR_ANALOG_IN_CH05_CONF, ANALOG_IN_CH05_CONF_VALUES::CH05_LOAD_CELL);
 
-  if (millis() - lastTiming > 1000 * 30) {
-    displayBanner();
-    lastTiming = millis();
-  } else {
-    displayMeasure();
+    Serial.println("AN: config completed");
+    Serial.printf("fwVersion: 0x%04x boardType: 0x%04x\n\n", nr.fwVersion(), nr.boardType());
   }
 
+  autozero();
+
+  int button_v = analogRead(GPIO_NUM_3);
+  // debug analog keyboard
+  // sprintf(buf, "V: %d %c   ", button_v, decodeButton(button_v));
+  // LCD_HOME(0);
+  // lcd.print(buf);
+  // Serial.println(buf);
+
   if (decodeButton(button_v) == 'S') {
-    weightLeft = readWeightL();
-    weightRight = readWeightR();
+    weightMeasure();
     lastTiming = millis();
   } else if (decodeButton(button_v) == 'U') {
     // lamp test on
@@ -222,24 +253,31 @@ void loop() {
     // lamp test off
     Serial.println("lamp test off");
     indicator = false;
+    winLock = false;
+  } else if (decodeButton(button_v) == 'L') {
+    // win lock off
+    Serial.println("win lock off");
+    indicator = false;
+    winLock = false;
   }
   nr.writeDigOut(1, indicator);
 
-  // AN delay configuration
-  // To set the configuration, in the loop inside an if there must be all the initial analog configurations, after having waited for the industrial side to start,
-  if (configAN && nr.isReady() && (millis() - msAN > AN_INIT_DELAY_MS)) {
-    configAN = false;
-    nr.writeRegister(WR_ANALOG_IN_CH01_CONF, ANALOG_IN_CH01_CONF_VALUES::CH01_LOAD_CELL);
-    nr.writeRegister(WR_ANALOG_IN_CH03_CONF, ANALOG_IN_CH03_CONF_VALUES::CH03_LOAD_CELL);
-
-    Serial.printf("fwVersion: 0x%04x boardType: 0x%04x\n", nr.fwVersion(), nr.boardType());
+  if (!winLock) {
+    if (millis() - lastTiming > 1000 * 30) {
+      displayBanner();
+      lastTiming = millis();
+    } else {
+      weightMeasure();
+      if (millis() - lastDisplayTiming > 1000 * 2) {
+        displayMeasure();
+        lastDisplayTiming = millis();
+      }
+    }
   }
 
-  // Serial.printf("RO_ANALOG_IN_CH01 %d\n", nr.loadRegister(RO_ANALOG_IN_CH01));
-  // Serial.printf("RO_ANALOG_IN_CH02 %d\n", nr.loadRegister(RO_ANALOG_IN_CH02));
-
+  // nr.showRegister();    // debug function
   // In the loop() there must be the following function, which allow the exchange of values with the industrial side board
   nr.writeAllRegister();
 
-  delay(500);  
+  delay(250);  
 }
