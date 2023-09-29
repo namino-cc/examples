@@ -2,7 +2,7 @@
 #define MAIN_H
 
 // RC-522 SPI PINS
-#define CS_PIN      16
+#define CS_PIN       2
 #define RST_PIN     18
 #define SCK_PIN     14
 #define MISO_PIN    17

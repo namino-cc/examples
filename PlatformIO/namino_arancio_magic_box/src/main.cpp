@@ -8,6 +8,12 @@
 
 #include "main.h"
 
+// Namino Arancio Instance
+namino_arancio  na = namino_arancio();
+bool            configANIN = true;
+bool            naminoReady = false;
+
+// RC522 Reader Instance
 MFRC522 mfrc522(CS_PIN, RST_PIN);   // Create MFRC522 instance.
 MFRC522::MIFARE_Key key;
 
@@ -27,17 +33,24 @@ void setup() {
   // put your setup code here, to run once:
   Serial.begin(115200);
   delay(2000);
+
+  // Init Namino Arancio Board
+  // reset namino microcontroller
+  na.resetSignalMicroprocessor();
+  na.begin(800000U, MISO, MOSI, SCK, SS);
+  delay(2000);
+
   Serial.println("");
   Serial.println("=====================================");
   Serial.println("##      RFID MAGIC BOX EXAMPLE     ##");
   Serial.println("=====================================");
   Serial.println();
-  Serial.print("RFID SPI MOSI: ");
-  Serial.println(MOSI_PIN);
-  Serial.print("RFID SPI MISO: ");
-  Serial.println(MISO_PIN);
-  Serial.print("RFID SPI SCK: ");
-  Serial.println(SCK_PIN);
+  Serial.print("SPI MOSI: ");
+  Serial.println(MOSI);
+  Serial.print("SPI MISO: ");
+  Serial.println(MISO);
+  Serial.print("SPI SCK: ");
+  Serial.println(SCK);
   Serial.print("RFID SPI CS: ");
   Serial.println(CS_PIN);  
   Serial.print("RFID SPI RST: ");
@@ -56,13 +69,15 @@ void setup() {
   digitalWrite(YELLOW_PIN, HIGH);    
 
   // Starting custom SPI
-  Serial.println("Starting SPI Interface");
   // SPI Setup (Custom Pins other than J3 on Namino boards)
-  SPI.begin(SCK_PIN, MISO_PIN, MOSI_PIN, CS_PIN);
+  // SPI.begin(SCK, MISO_PIN, MOSI, CS_PIN);
 
   // MFRC522 Setup
+  Serial.println("Starting RFID Reader");
   mfrc522.PCD_Init(); // Init MFRC522 card
-  delay(2000);
+  delay(4000);
+
+
 
   // Testing MFRC522 Reader
   if (mfrc522.PCD_PerformSelfTest())  {
@@ -75,8 +90,11 @@ void setup() {
     readerOk = true;
   }
   else  {
+    readerOk = false;
     Serial.println("Error in Reader Self Test");
   }
+  // Force Reader Ok also if test failed
+  readerOk = true;
   // Starting
   delay(2000);
   digitalWrite(GREEN_PIN, LOW);    
@@ -91,16 +109,45 @@ void loop() {
   uint64_t    tagIDHigh = 0;
   byte        tagID[TAG_LEN];
 
+  // Read Industrial Registers
+  na.readAllRegister();
+  naminoReady = false;
+  naminoReady = na.isReady();
+
+  // Check Analog In Configuration
+  if (configANIN && naminoReady) {
+    // Configure analog Input (not used at the moment)  
+    na.writeRegister(WR_ANALOG_IN_CH01_CONF, ANALOG_IN_CH01_CONF_VALUES::CH01_VOLTAGE);
+    na.writeRegister(WR_ANALOG_IN_CH02_CONF, ANALOG_IN_CH02_CONF_VALUES::CH02_VOLTAGE);  
+    na.writeRegister(WR_ANALOG_IN_CH03_CONF, ANALOG_IN_CH03_CONF_VALUES::CH03_VOLTAGE);
+    na.writeRegister(WR_ANALOG_IN_CH04_CONF, ANALOG_IN_CH04_CONF_VALUES::CH04_VOLTAGE);
+    na.writeRegister(WR_ANALOG_OUT_CH01_CONF, ANALOG_OUT_CH01_CONF_VALUES::OUT_CH01_VOLTAGE);
+    na.writeAnalogOut(0.0); // output voltage
+    Serial.println("NR config completed");
+    Serial.printf("fwVersion: 0x%04x boardType: 0x%04x\n", na.fwVersion(), na.boardType());
+    configANIN = false;
+  }
+
   // limit loop period
   if (abs( (long long) (theTime - lastLoop)) < LOOP_PERIOD)  {
-    return;
+    goto endLoop;
   }
   lastLoop = theTime;
 
+  if (naminoReady)  {
+    // Reading Keylock Status and setting Keylock Light
+    if (na.readDigIn(KEYLOCK_IN))  {
+      na.writeDigOut(WHITE_LIGHT, true);
+    }
+    else  {
+      na.writeDigOut(WHITE_LIGHT, false);
+    }
+  }
+
   // Check RFID Reader
   if (not readerOk)  {
-    Serial.println("No Reader Found!");
-    return;
+    // Serial.println("No Reader Found!");
+    goto endLoop;
   }
 
   // Switch Off Keylock
@@ -173,6 +220,12 @@ void loop() {
       tagOK();
     }
   }
+
+endLoop:
+  // Write Industrial Registers
+  // na.showRegister();
+  delay(50);
+  na.writeAllRegister();
 }
 
 void tagOK()
@@ -194,12 +247,18 @@ void tagFailed()
 void setKeyLock(bool keyON)
 {
   if (keyON)  {
-	  digitalWrite(RED_PIN, HIGH);    
+	  digitalWrite(RED_PIN, HIGH);
+    if (naminoReady)  {
+      na.writeRele(true);
+    }
   }
   else  {
 	  digitalWrite(RED_PIN, LOW);    
+    if (naminoReady)  {
+      na.writeRele(false);
+    }
   }
-  Serial.printf("Set KeyLock: [%d]\n", keyON);
+  Serial.printf("Set KeyLock: [%d] Namino Ready:[%d]\n", keyON, naminoReady);
 }
 
 bool setBlink(bool blinkON)
