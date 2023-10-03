@@ -23,108 +23,109 @@ SOFTWARE.
 
 /* NB, use profile: adafruit_feather_esp32s3_reversetft */
 
-/* ESP32-S3 datasheet https://www.espressif.com/sites/default/files/documentation/esp32-s3-wroom-1_wroom-1u_datasheet_en.pdf */
+/* datasheets:
+   https://www.espressif.com/sites/default/files/documentation/esp32-s3-wroom-1_wroom-1u_datasheet_en.pdf 
+   https://www.analog.com/media/en/technical-documentation/data-sheets/max7219-max7221.pdf
+   infos:
+   http://www.whatimade.today/programming-an-8-digit-7-segment-display-the-easy-way-using-a-max7219/
+*/
 
 #include <Arduino.h>
 #include <SPI.h>
 #include <Mapf.h>
 
-#include "namino_rosso.h"
+#include "./namino_rosso.h"
 
 #ifdef NAMINO_ROSSO_BOARD
 #undef NAMINO_ROSSO_BOARD
 #endif
 
 namino_rosso nr = namino_rosso();
-uint16_t loopNr = 1;
-float_t setPoint = 30;
+uint16_t      loopNr = 1;
+float_t       setPoint = 30;
+char          buf[64] = { 0 };
+uint8_t       rele = 0;
+bool          configANOUT = true;
+unsigned long msANOUT = millis();
+float_t       tc = 0;
+#define AN_OUT_INIT_DELAY_MS  (5 * 1000)
 
-#include "Arduino.h"
 
-// LED 8 digit 74HC595
-#define DIO_PIN            9    /* data I/O */
-#define SCK_PIN           18    /* clock */
-#define RCK_PIN           17    /* latch */
-#define LED_DIGITS         8
+#define DISPLAY_DIGITS  8
+// define pins attached to MAX7219 (and also see notes above)
+#define MAX7219_DIN           38
+#define MAX7219_CS            39
+#define MAX7219_CLK           40
 
-// https://forum.arduino.cc/index.php?topic=518797.0
-// ST_CP = SCK
-// SH_CP = RCK
-// SDI   = DIO
-// Common anode
-#define DS 		DIO_PIN
-#define STCP 	SCK_PIN
-#define SHCP 	RCK_PIN
-#define SPEED 	500
+// enumerate the MAX7219 registers
+// See MAX7219 Datasheet, Table 2, page 7
+enum {  MAX7219_REG_DECODE    = 0x09,  
+        MAX7219_REG_INTENSITY = 0x0A,
+        MAX7219_REG_SCANLIMIT = 0x0B,
+        MAX7219_REG_SHUTDOWN  = 0x0C,
+        MAX7219_REG_DISPTEST  = 0x0F };
 
-bool numbersDef[10][8] = 
-{
-  {1,1,1,1,1,1,0}, //zero
-  {0,1,1,0,0,0,0}, //one
-  {1,1,0,1,1,0,1}, //two
-  {1,1,1,1,0,0,1}, //three
-  {0,1,1,0,0,1,1}, //four
-  {1,0,1,1,0,1,1}, //five
-  {1,0,1,1,1,1,1}, //six
-  {1,1,1,0,0,0,0}, //seven
-  {1,1,1,1,1,1,1}, //eight
-  {1,1,1,1,0,1,1}  //nine
-};
+// enumerate the SHUTDOWN modes
+// See MAX7219 Datasheet, Table 3, page 7
+enum  { OFF = 0,  
+        ON  = 1 };
 
-bool digitsTable[8][8] =
-{
-  {0,0,0,0,1,0,0,0}, // first digit
-  {0,0,0,0,0,1,0,0}, // second
-  {0,0,0,0,0,0,1,0}, // third
-  {0,0,0,0,0,0,0,1},  // 8th 
-  {1,0,0,0,0,0,0,0}, // forth
-  {0,1,0,0,0,0,0,0}, // fifth
-  {0,0,1,0,0,0,0,0},  // sixth  
-  {0,0,0,1,0,0,0,0} // 7th
+const byte DP     = 0b10000000;  
+const byte C      = 0b01001110;  
+const byte F      = 0b01000111;
+const byte COMMA  = 0b11111111;
 
-   
-};
-
-bool display_buffer[32];
-void prepareDisplayBuffer(int number, int digit_order, boolean showDot)
-{
-  for(int index=7; index>=0; index--)
-  {
-    display_buffer[index] = digitsTable[digit_order-1][index];
-  }
-  for(int index=14; index>=8; index--)
-  {
-    display_buffer[index] = !numbersDef[number-1][index]; //because logic is sanity, right?
-  }
-  if(showDot == true)
-    display_buffer[15] = 0;
-  else
-    display_buffer[15] = 1;
+// write a value into a max7219 register 
+// See MAX7219 Datasheet, Table 1, page 6
+void set_register(byte reg, byte value) {
+    digitalWrite(MAX7219_CS, LOW);
+    shiftOut(MAX7219_DIN, MAX7219_CLK, MSBFIRST, reg);
+    shiftOut(MAX7219_DIN, MAX7219_CLK, MSBFIRST, value);
+    digitalWrite(MAX7219_CS, HIGH);
 }
 
-void writeDigit(int number, int order, bool showDot = false)
-{
-  prepareDisplayBuffer(number, order, showDot);
-  digitalWrite(SHCP, LOW);
-  for(int i=15; i>=0; i--)
-  {
-      digitalWrite(STCP, LOW);
-      digitalWrite(DS, display_buffer[i]); //output LOW - enable segments, HIGH - disable segments
-      digitalWrite(STCP, HIGH);
-   }
-  digitalWrite(SHCP, HIGH);
+// reset the max7219 chip
+void resetDisplay() {
+    set_register(MAX7219_REG_SHUTDOWN, OFF);   // turn off display
+    set_register(MAX7219_REG_DISPTEST, OFF);   // turn off test mode
+    set_register(MAX7219_REG_INTENSITY, 0x0D); // display intensity
+}
+
+// display the GET TEMP / SET TEMP on the 7-segment display
+void display(String s) {
+    set_register(MAX7219_REG_SHUTDOWN, OFF);      // turn off display
+    set_register(MAX7219_REG_SCANLIMIT, 7);       // scan limit 8 digits
+    set_register(MAX7219_REG_DECODE, 0b11111111); // decode only 1 digits
+
+    set_register(1, s.charAt(7));
+    set_register(2, s.charAt(6));
+    set_register(3, s.charAt(5));
+    set_register(4, s.charAt(4));
+    set_register(5, s.charAt(3) | DP);
+    set_register(6, s.charAt(2));
+    set_register(7, s.charAt(1));
+    set_register(8, s.charAt(0));
+
+    set_register(MAX7219_REG_SHUTDOWN, ON);   // Turn On display
 }
 
 void setup() {
   Serial.begin(115200);
-  delay(500);  // mandatory delay
+  delay(5000);  // mandatory delay
 
-  // pinMode(DS,         OUTPUT);
-  // pinMode(STCP,       OUTPUT);
-  // pinMode(SHCP,       OUTPUT);
-  // digitalWrite(DS,    LOW);
-  // digitalWrite(STCP,  LOW);
-  // digitalWrite(SHCP,  LOW);
+  Serial.println();
+  Serial.println("=========================================");
+  Serial.println("## NAMINO ROSSO LAMP THERMO REGULATION ##");
+  Serial.println("=========================================");
+  Serial.println();
+  Serial.flush();
+
+  pinMode(MAX7219_DIN, OUTPUT);   // serial data-in
+  pinMode(MAX7219_CS, OUTPUT);    // chip-select, active low    
+  pinMode(MAX7219_CLK, OUTPUT);   // serial clock
+  digitalWrite(MAX7219_CS, HIGH);
+
+  resetDisplay();                 // reset the MAX2719 display
 
   // reset namino microcontroller. Industrial side board reset.
   nr.resetSignalMicroprocessor();
@@ -132,57 +133,20 @@ void setup() {
   // Opening/closing of communication / initialization of the industrial side interface
   nr.begin(800000U, MISO, MOSI, SCK, SS);
 
-  Serial.println();
-  Serial.println("=========================================");
-  Serial.println("## NAMINO ROSSO LAMP THERMO REGULATION ##");
-  Serial.println("=========================================");
-  Serial.println();
   delay(2000);
-
-  // // for (int i = 0; i <= 1000; i++) {
-  // //   display.set("0000", ALIGN_LEFT);
-  // //   display.show(2000);
-  // //   display.update();
-  // //   Serial.println(i);
-  // // }
-
-  // for (int i = 1000; i > 0; i--) {
-	// 	// store number and show it for 400ms
-	// 	display.set("AAAAAAAA", ALIGN_LEFT);
-  //   //display.changeDot(0);
-	// 	display.show(400);
-	// 	// add dot to stored number and show it for 400ms
-	// 	//display.changeDot(0);
-	// 	//display.show(400);
-	// }
-
-  // display.set("01234567");
 }
-
-uint8_t rele = 0;
-bool configANOUT = true;
-unsigned long msANOUT = millis();
-#define AN_OUT_INIT_DELAY_MS      (5 * 1000)
 
 float round2(float value) {
    return (int)(value * 100 + 0.5) / 100.0;
 }
 
 void loop() {
-  // writeDigit(0, 1,true); // write 0 on first digit
-  // writeDigit(1, 2,false); // write 1 on second digit
-  // writeDigit(2, 3,false); // write 7 on third digit
-  // writeDigit(3, 4, false);
-  // writeDigit(4, 5,true);
-  // writeDigit(5, 6, false);
-  // writeDigit(6, 7,false);
-  // writeDigit(7, 8,false);
-
   // potentiometer useful conversion for temperature setpoint
   uint16_t cpot = analogRead(ADC1_CH3);         // PIN 4 on board mark
   float vpot = cpot * (3.3 / 4096.0);
   float tpot = mapf(cpot, 0, 4096, 20, 60);
   setPoint = tpot;
+  float_t tc = 0;
 
   // In the loop() there must be the following functions, which allow the exchange of values with the industrial side board
   nr.readAllRegister();
@@ -199,9 +163,9 @@ void loop() {
   // The industrial side NAMINO board performs some initializations, if the board has finished the initialization and is ready this function returns true
   if (nr.isReady()) {
     // Reading converted to reference units by the channel with a connected thermocouple and/or thermometric probe.
-    float_t tc = nr.readPt1000(1);
+    tc = nr.readPt1000(1);
     // Serial.printf("readPt1000(1) %f RO_ANALOG_IN_CH01 %d setPoint %f\n", tc, nr.loadRegister(RO_ANALOG_IN_CH01), setPoint);
-    Serial.printf("vpot: %f V | T set: %f C | T get: %f C\n", vpot, setPoint, tc);
+    Serial.printf("vpot: %3.6f V | T set: %3.6f C | T get: %3.6f C\n", vpot, setPoint, tc);
     if (tc < setPoint) {
       nr.writeRele(true);  // Relay status setting.
     } else {
@@ -209,14 +173,21 @@ void loop() {
     }
   }
 
-  // nr.showRegister();    // debug function
-  // // In the loop() there must be the following function, which allow the exchange of values with the industrial side board
+  // debug function
+  // nr.showRegister();
+
+  // In the loop() there must be the following function, which allow the exchange of values with the industrial side board
   nr.writeAllRegister();  
 
+  // debug functions
   // Serial.printf("RO_NAMINO_ID   %d\n", nr.loadRegister(RO_NAMINO_ID));
   // Serial.printf("RO_LIFE_TIME_L %d\n", nr.loadRegister(RO_LIFE_TIME_L));
   // Serial.printf("RO_LIFE_TIME_H %d\n", nr.loadRegister(RO_LIFE_TIME_H));
   // Serial.printf("RO_ANALOG_IN_CH01 %d\n", nr.loadRegister(RO_ANALOG_IN_CH01));
+
+  // display formatted temperatures on MAX7219
+  sprintf(buf, "%4.1f%4.1f", tc, setPoint);
+  display(String(buf));
 
   delay(500);
 }
