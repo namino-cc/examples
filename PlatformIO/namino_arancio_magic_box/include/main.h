@@ -2,6 +2,7 @@
 #define MAIN_H
 
 // RC-522 SPI PINS
+#define CS_MICRO    10
 #define CS_PIN       2
 #define RST_PIN     18
 #define SCK_PIN     14
@@ -24,10 +25,10 @@
 
 // Loop interval
 #define LOOP_PERIOD        100          // 100ms loop period
-#define LINE_LEN            40          // Line Buffer Size
+#define LINE_LEN            60          // Line Buffer Size
 #define TAG_LEN             16          // Maximum Tag Len
 #define KEYLOCK_ON_TIME    150          // Lock opening impulse duration
-#define BLINK_ON_TIME    20000          // Blink On Time  
+#define BLINK_ON_TIME    10000          // Blink On Time  
 #define RESULT_TIME       6000          // Time to show Failure or Success
 
 // Function Protos

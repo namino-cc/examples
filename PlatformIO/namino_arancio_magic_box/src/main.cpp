@@ -34,11 +34,6 @@ void setup() {
   Serial.begin(115200);
   delay(2000);
 
-  // Init Namino Arancio Board
-  // reset namino microcontroller
-  na.resetSignalMicroprocessor();
-  na.begin(800000U, MISO, MOSI, SCK, SS);
-  delay(2000);
 
   Serial.println("");
   Serial.println("=====================================");
@@ -67,17 +62,17 @@ void setup() {
   digitalWrite(GREEN_PIN, HIGH);    
   digitalWrite(RED_PIN, HIGH);    
   digitalWrite(YELLOW_PIN, HIGH);    
+  pinMode(CS_MICRO, OUTPUT);
+  digitalWrite(CS_MICRO, HIGH);    
 
-  // Starting custom SPI
-  // SPI Setup (Custom Pins other than J3 on Namino boards)
-  // SPI.begin(SCK, MISO_PIN, MOSI, CS_PIN);
+  // Starting SPI
+  // SPI Setup (Exposed SPI Pin of Namino boards)
+  SPI.begin(SCK, MISO, MOSI, CS_PIN);
 
   // MFRC522 Setup
   Serial.println("Starting RFID Reader");
   mfrc522.PCD_Init(); // Init MFRC522 card
   delay(4000);
-
-
 
   // Testing MFRC522 Reader
   if (mfrc522.PCD_PerformSelfTest())  {
@@ -93,10 +88,13 @@ void setup() {
     readerOk = false;
     Serial.println("Error in Reader Self Test");
   }
-  // Force Reader Ok also if test failed
-  readerOk = true;
-  // Starting
+
+  // Init Namino Arancio Board
+  // reset namino microcontroller
+  na.resetSignalMicroprocessor();
+  na.begin(800000U, MISO, MOSI, SCK, SS);
   delay(2000);
+  // Starting
   digitalWrite(GREEN_PIN, LOW);    
   digitalWrite(RED_PIN, LOW);    
   digitalWrite(YELLOW_PIN, LOW);    
@@ -107,12 +105,20 @@ void loop() {
   char line[LINE_LEN + 1];
   uint64_t    tagIDLow = 0;
   uint64_t    tagIDHigh = 0;
+  uint32_t    naLifeTime = 0;
   byte        tagID[TAG_LEN];
+
+
+  // limit loop period
+  if (abs( (long long) (theTime - lastLoop)) < LOOP_PERIOD)  {
+    return;
+  }
+  lastLoop = theTime;
 
   // Read Industrial Registers
   na.readAllRegister();
-  naminoReady = false;
   naminoReady = na.isReady();
+  naLifeTime = na.readLifeTime();
 
   // Check Analog In Configuration
   if (configANIN && naminoReady) {
@@ -124,15 +130,9 @@ void loop() {
     na.writeRegister(WR_ANALOG_OUT_CH01_CONF, ANALOG_OUT_CH01_CONF_VALUES::OUT_CH01_VOLTAGE);
     na.writeAnalogOut(0.0); // output voltage
     Serial.println("NR config completed");
-    Serial.printf("fwVersion: 0x%04x boardType: 0x%04x\n", na.fwVersion(), na.boardType());
+    Serial.printf("fwVersion: [0x%04x] boardType: [0x%04x] LifeTime: [%u]\n", na.fwVersion(), na.boardType(), naLifeTime);
     configANIN = false;
   }
-
-  // limit loop period
-  if (abs( (long long) (theTime - lastLoop)) < LOOP_PERIOD)  {
-    goto endLoop;
-  }
-  lastLoop = theTime;
 
   if (naminoReady)  {
     // Reading Keylock Status and setting Keylock Light
@@ -142,12 +142,6 @@ void loop() {
     else  {
       na.writeDigOut(WHITE_LIGHT, false);
     }
-  }
-
-  // Check RFID Reader
-  if (not readerOk)  {
-    // Serial.println("No Reader Found!");
-    goto endLoop;
   }
 
   // Switch Off Keylock
@@ -177,6 +171,13 @@ void loop() {
       startResultTime = 0;
     }
   }
+
+  // Check RFID Reader
+  if (not readerOk)  {
+    Serial.println("*");
+    return;
+  }
+
   // Check RFID Presence only if ended result time
   if(startBlinkTime == 0 && mfrc522.PICC_IsNewCardPresent()) { 
     // new tag is available
@@ -213,18 +214,18 @@ void loop() {
       else  {
         tagIDHigh = 0;
       }
-      Serial.printf("[%s] Len:[%d] Low:[%u] - High:[%u]\n", line, mfrc522.uid.size, tagIDLow, tagIDHigh);
+      Serial.printf("[%s] Len:[%d] Low:[%u] - High:[%u] System Lifetime:[%u]\n", line, mfrc522.uid.size, tagIDLow, tagIDHigh, naLifeTime);
       mfrc522.PICC_HaltA();     // halt PICC
       mfrc522.PCD_StopCrypto1(); // stop encryption on PCD
       // Success Reading Tag
       tagOK();
     }
   }
-
-endLoop:
-  // Write Industrial Registers
-  // na.showRegister();
-  delay(50);
+  else  {
+    Serial.print(naminoReady ? "." : "#");
+    // Serial.printf("Namino Ready:[%s] - Lifetime:[%u]\n", naminoReady ? "1" : "0", na.readLifeTime());
+  }
+  // Update Industrial Registers
   na.writeAllRegister();
 }
 
