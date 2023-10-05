@@ -74,6 +74,7 @@ const byte DP     = 0b10000000;
 const byte C      = 0b01001110;  
 const byte F      = 0b01000111;
 const byte COMMA  = 0b11111111;
+const byte BLANK  = 0b00000000;
 
 // write a value into a max7219 register 
 // See MAX7219 Datasheet, Table 1, page 6
@@ -95,16 +96,16 @@ void resetDisplay() {
 void display(String s) {
     set_register(MAX7219_REG_SHUTDOWN, OFF);      // turn off display
     set_register(MAX7219_REG_SCANLIMIT, 7);       // scan limit 8 digits
-    set_register(MAX7219_REG_DECODE, 0b11111111); // decode only 1 digits
+    set_register(MAX7219_REG_DECODE, 0b01110111); // decode only 1 digits MSD = bit 7, LSD = bit 0
 
-    set_register(1, s.charAt(7));
-    set_register(2, s.charAt(6));
+    set_register(1, s.charAt(7));           // LSD
+    set_register(2, s.charAt(6) | DP);
     set_register(3, s.charAt(5));
-    set_register(4, s.charAt(4));
-    set_register(5, s.charAt(3) | DP);
-    set_register(6, s.charAt(2));
+    set_register(4, BLANK);
+    set_register(5, s.charAt(3));
+    set_register(6, s.charAt(2) | DP);
     set_register(7, s.charAt(1));
-    set_register(8, s.charAt(0));
+    set_register(8, BLANK);           // MSD
 
     set_register(MAX7219_REG_SHUTDOWN, ON);   // Turn On display
 }
@@ -186,7 +187,7 @@ void loop() {
   // Serial.printf("RO_ANALOG_IN_CH01 %d\n", nr.loadRegister(RO_ANALOG_IN_CH01));
 
   // display formatted temperatures on MAX7219
-  sprintf(buf, "%4.1f%4.1f", tc, setPoint);
+  sprintf(buf, "%4.0f%4.0f", tc * 10.0, setPoint * 10.0);
   display(String(buf));
 
   delay(500);
