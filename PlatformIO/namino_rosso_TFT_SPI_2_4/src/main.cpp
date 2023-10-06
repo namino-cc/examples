@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include <SPI.h>
 #include <Preferences.h>
+#include <SD.h>
 
 #include "namino_rosso.h"
 
@@ -16,6 +17,7 @@ Preferences appPreferences;
 
 #define LOOP_PERIOD   500 // 500ms loop period
 #define CS_MICRO      10
+#define CS_SD_CARD    14
 #define CALIBRATION_DATA    "pointercal"
 #define CALIBRATION_POINTS  5
 
@@ -24,6 +26,7 @@ TFT_eSPI myGLCD = TFT_eSPI(); // Invoke custom library
 unsigned long lastLoop = 0;
 unsigned long loopCounter = 0;
 uint32_t      myColor = TFT_BLACK;
+bool          sdCardPresent = false;
 
 // Color Loop Flags
 uint8_t       myRed = 0;
@@ -257,6 +260,7 @@ void setup() {
   digitalWrite(CS_MICRO, HIGH);    
 
   // TFT Init
+  Serial.println("Starting TFT Display");
   myGLCD.init();
   myGLCD.setRotation(1);
   myGLCD.fillScreen(TFT_BLACK);       //  fill the screen with black color
@@ -272,6 +276,32 @@ void setup() {
     touch_calibrate();
   }
   Serial.println("Display Init Done");
+
+  // SD Card
+  Serial.println("Starting SD Card");
+  if(SD.begin(CS_SD_CARD))  {
+    sdCardPresent = true;
+    Serial.print("Card type:         ");
+    switch (SD.cardType()) {
+    case CARD_NONE:
+      Serial.println("NONE");
+      break;
+    case CARD_MMC:
+      Serial.println("MMC");
+      break;
+    case CARD_SD:
+      Serial.println("SD");
+      break;
+    case CARD_SDHC:
+      Serial.println("SDHC");
+      break;
+    default:
+      Serial.println("Unknown");
+    }    
+  }
+  else  {
+    Serial.println("SD Card not found");
+  }
 
   // reset namino microcontroller. Industrial side board reset.
   nr.resetSignalMicroprocessor();
