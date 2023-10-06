@@ -1,5 +1,7 @@
 #include <Arduino.h>
 #include <SPI.h>
+#include <Preferences.h>
+
 #include "namino_rosso.h"
 
 #ifdef NAMINO_ROSSO_BOARD
@@ -10,9 +12,12 @@
 
 namino_rosso nr = namino_rosso();
 
+Preferences appPreferences;
 
 #define LOOP_PERIOD   500 // 500ms loop period
 #define CS_MICRO      10
+#define CALIBRATION_DATA    "pointercal"
+#define CALIBRATION_POINTS  5
 
 TFT_eSPI myGLCD = TFT_eSPI(); // Invoke custom library
 
@@ -27,6 +32,44 @@ uint8_t       myBlue = 0;
 bool          redDone = false;
 bool          greenDone = false;
 bool          blueDone = false;
+
+bool readTouchCalibration(uint16_t *calData)
+{
+  char      ptKey[5];
+  bool      nonZero = false;
+
+  appPreferences.begin(CALIBRATION_DATA, true);
+  for (uint8_t nPoint = 0; nPoint < CALIBRATION_POINTS; nPoint++)  {
+    sprintf(ptKey, "pt%d", nPoint + 1);
+    calData[nPoint] = appPreferences.getUShort(ptKey, 0);
+    // At least one value must be non-zero
+    if (not nonZero && calData[nPoint] > 0)  {
+      nonZero = true;
+    }
+    Serial.printf("Read Calibration Point:%d Key:%s Value:%d Non Zero:[%d]", nPoint + 1, ptKey, calData[nPoint], nonZero);
+    Serial.println();
+  }
+  appPreferences.end();
+  return nonZero;
+}
+
+bool writeTouchCalibration(uint16_t *calData)
+{
+  char      ptKey[5];
+  int       nBytes = 0;
+  bool      nonZero = true;
+
+  appPreferences.begin(CALIBRATION_DATA, false);
+  for (uint8_t nPoint = 0; nPoint < CALIBRATION_POINTS && nonZero; nPoint++)  {
+    sprintf(ptKey, "pt%d", nPoint + 1);
+    nBytes = appPreferences.putUShort(ptKey, calData[nPoint]);
+    nonZero = nBytes == sizeof(uint16_t);
+    Serial.printf("Updated Calibration Point:%d Key:%s Value:%d Success:[%d]", nPoint + 1, ptKey, calData[nPoint], nonZero);
+    Serial.println();
+  }
+  appPreferences.end();
+  return nonZero;
+}
 
 void printText(int x, int y, String text, uint8_t textSize = 1, uint8_t textAllign = 1, uint8_t lineLength = 239) {
   /*  This function is used for displaying text on the screen
@@ -143,9 +186,46 @@ void printText(int x, int y, String text, uint8_t textSize = 1, uint8_t textAlli
     myGLCD.println(text);
   }
 }
-void touch_calibrate();
+
+// Code to run a screen calibration, not needed when calibration values set in setup()
+void touch_calibrate()
+{
+  uint16_t calData[CALIBRATION_POINTS];
+  uint8_t calDataOK = 0;
+
+  // Calibrate
+  myGLCD.fillScreen(TFT_BLACK);
+  myGLCD.setCursor(20, 0);
+  myGLCD.setTextFont(2);
+  myGLCD.setTextSize(1);
+  myGLCD.setTextColor(TFT_WHITE, TFT_BLACK);
+
+  myGLCD.println("Touch corners as indicated");
+
+  myGLCD.setTextFont(1);
+  myGLCD.println();
+
+  myGLCD.calibrateTouch(calData, TFT_MAGENTA, TFT_BLACK, 15);
+
+  myGLCD.fillScreen(TFT_BLACK);
+  
+  myGLCD.setTextColor(TFT_GREEN, TFT_BLACK);
+  myGLCD.println("Calibration complete!");
+  if (writeTouchCalibration(calData))  {
+    myGLCD.println("Calibration Data saved");
+    Serial.println("Calibration Data saved");
+  }
+  else  {
+    myGLCD.println("Error Saving Calibration Data");
+    Serial.println("Error Saving Calibration Data");
+  }
+  delay(4000);
+}
 
 void setup() {
+
+  uint16_t calibrationData[CALIBRATION_POINTS] = {0,0,0,0,0};   // Screen Calibration Data
+
   // Serial Setup
   Serial.begin(115200);
   delay(3000);
@@ -181,9 +261,17 @@ void setup() {
   myGLCD.setRotation(1);
   myGLCD.fillScreen(TFT_BLACK);       //  fill the screen with black color
   myGLCD.setTextColor(TFT_GREEN);     //  set the text color
-  Serial.println("Display Init Done");
+  
   // Calibrate the touch screen and retrieve the scaling factors
-  // touch_calibrate();
+  Serial.println("Retrieving Calibration Data");
+  if (readTouchCalibration(calibrationData))  {
+    myGLCD.setTouch(calibrationData);
+    Serial.println("TFT Calibration Data applied");
+  }
+  else  {
+    touch_calibrate();
+  }
+  Serial.println("Display Init Done");
 
   // reset namino microcontroller. Industrial side board reset.
   nr.resetSignalMicroprocessor();
@@ -280,46 +368,3 @@ void loop() {
   Serial.println(buf);
 }
 
-// Code to run a screen calibration, not needed when calibration values set in setup()
-void touch_calibrate()
-{
-  uint16_t calData[5];
-  uint8_t calDataOK = 0;
-
-  // Calibrate
-  myGLCD.fillScreen(TFT_BLACK);
-  myGLCD.setCursor(20, 0);
-  myGLCD.setTextFont(2);
-  myGLCD.setTextSize(1);
-  myGLCD.setTextColor(TFT_WHITE, TFT_BLACK);
-
-  myGLCD.println("Touch corners as indicated");
-
-  myGLCD.setTextFont(1);
-  myGLCD.println();
-
-  myGLCD.calibrateTouch(calData, TFT_MAGENTA, TFT_BLACK, 15);
-
-  Serial.println(); Serial.println();
-  Serial.println("// Use this calibration code in setup():");
-  Serial.print("  uint16_t calData[5] = ");
-  Serial.print("{ ");
-
-  for (uint8_t i = 0; i < 5; i++)
-  {
-    Serial.print(calData[i]);
-    if (i < 4) Serial.print(", ");
-  }
-
-  Serial.println(" };");
-  Serial.print("  myGLCD.setTouch(calData);");
-  Serial.println(); Serial.println();
-
-  myGLCD.fillScreen(TFT_BLACK);
-  
-  myGLCD.setTextColor(TFT_GREEN, TFT_BLACK);
-  myGLCD.println("Calibration complete!");
-  myGLCD.println("Calibration code sent to Serial port.");
-
-  delay(4000);
-}
