@@ -1,3 +1,6 @@
+/*
+ * info display: http://www.lcdwiki.com/2.4inch_SPI_Module_ILI9341_SKU:MSP2402
+*/
 #include <Arduino.h>
 #include <SPI.h>
 #include <Preferences.h>
@@ -18,6 +21,7 @@ Preferences appPreferences;
 #define LOOP_PERIOD   500 // 500ms loop period
 #define CS_MICRO      10
 #define CS_SD_CARD    14
+#define TFT_BACKLIGHT 16
 #define CALIBRATION_DATA    "pointercal"
 #define CALIBRATION_POINTS  5
 
@@ -250,7 +254,9 @@ void setup() {
   Serial.print("TFT SPI DC: ");
   Serial.println(TFT_DC);  
   Serial.print("TOUCH_CS: ");
-  Serial.println(TOUCH_CS);  
+  Serial.println(TOUCH_CS);
+  Serial.print("TFT_BACKLIGHT: ");
+  Serial.println(TFT_BACKLIGHT);
   Serial.println("-------------------");
   Serial.flush();
   delay(2000);
@@ -260,6 +266,9 @@ void setup() {
   digitalWrite(CS_MICRO, HIGH);    
 
   // TFT Init
+  pinMode(TFT_BACKLIGHT, OUTPUT);
+  digitalWrite(TFT_BACKLIGHT, HIGH);
+
   Serial.println("Starting TFT Display");
   myGLCD.init();
   myGLCD.setRotation(1);
@@ -279,6 +288,9 @@ void setup() {
 
   // SD Card
   Serial.println("Starting SD Card");
+  pinMode(CS_SD_CARD, OUTPUT);
+  digitalWrite(CS_SD_CARD, HIGH);
+  // TODO insert common spi pins
   if(SD.begin(CS_SD_CARD))  {
     sdCardPresent = true;
     Serial.print("Card type:         ");
