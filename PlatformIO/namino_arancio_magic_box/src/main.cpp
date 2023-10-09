@@ -107,6 +107,7 @@ void loop() {
   uint64_t    tagIDHigh = 0;
   uint32_t    naLifeTime = 0;
   byte        tagID[TAG_LEN];
+  bool        keyLocked = true;
 
 
   // limit loop period
@@ -130,17 +131,20 @@ void loop() {
     na.writeRegister(WR_ANALOG_OUT_CH01_CONF, ANALOG_OUT_CH01_CONF_VALUES::OUT_CH01_VOLTAGE);
     na.writeAnalogOut(0.0); // output voltage
     Serial.println("NR config completed");
-    Serial.printf("fwVersion: [0x%04x] boardType: [0x%04x] LifeTime: [%u]\n", na.fwVersion(), na.boardType(), naLifeTime);
+    Serial.printf("fwVersion: [0x%04x] boardType: [0x%04x] LifeTime: [%d]\n", na.fwVersion(), na.boardType(), naLifeTime);
     configANIN = false;
   }
 
   if (naminoReady)  {
     // Reading Keylock Status and setting Keylock Light
-    if (na.readDigIn(KEYLOCK_IN))  {
-      na.writeDigOut(WHITE_LIGHT, true);
+    keyLocked = na.readDigIn(KEYLOCK_IN);
+    if (keyLocked)  {
+      // Keylock Input is ON if keylock is closed, so White Light must be OFF 
+      na.writeDigOut(WHITE_LIGHT, false);
     }
     else  {
-      na.writeDigOut(WHITE_LIGHT, false);
+      // White Light must be ON if Keylock is OFF
+      na.writeDigOut(WHITE_LIGHT, true);
     }
   }
 
@@ -167,7 +171,9 @@ void loop() {
   if (startResultTime > 0)  {
     if (RESULT_TIME < (theTime - startResultTime))  {
       digitalWrite(GREEN_PIN, LOW);
+      na.writeDigOut(GREEN_LIGHT, false);
       digitalWrite(RED_PIN, LOW);
+      na.writeDigOut(RED_LIGHT, false);
       startResultTime = 0;
     }
   }
@@ -179,7 +185,7 @@ void loop() {
   }
 
   // Check RFID Presence only if ended result time
-  if(startBlinkTime == 0 && mfrc522.PICC_IsNewCardPresent()) { 
+  if(keyLocked && startBlinkTime == 0 && mfrc522.PICC_IsNewCardPresent()) { 
     // new tag is available
     lastTagdRead = theTime;
     Serial.println();
@@ -214,7 +220,7 @@ void loop() {
       else  {
         tagIDHigh = 0;
       }
-      Serial.printf("[%s] Len:[%d] Low:[%u] - High:[%u] System Lifetime:[%u]\n", line, mfrc522.uid.size, tagIDLow, tagIDHigh, naLifeTime);
+      Serial.printf("[%s] Len:[%d] Low:[%u] - High:[%u] System Lifetime:[%d]\n", line, mfrc522.uid.size, tagIDLow, tagIDHigh, naLifeTime);
       mfrc522.PICC_HaltA();     // halt PICC
       mfrc522.PCD_StopCrypto1(); // stop encryption on PCD
       // Success Reading Tag
@@ -222,8 +228,8 @@ void loop() {
     }
   }
   else  {
-    Serial.print(naminoReady ? "." : "#");
-    // Serial.printf("Namino Ready:[%s] - Lifetime:[%u]\n", naminoReady ? "1" : "0", na.readLifeTime());
+    Serial.print(keyLocked ? "L" : "U");
+    // Serial.printf("Namino Ready:[%s] - Lifetime:[%d]\n", naminoReady ? "1" : "0", na.readLifeTime());
   }
   // Update Industrial Registers
   na.writeAllRegister();
@@ -237,24 +243,26 @@ void tagOK()
   startBlinkTime = lastDoorOpened;
   startResultTime = lastDoorOpened;
   digitalWrite(GREEN_PIN, HIGH);
+  na.writeDigOut(GREEN_LIGHT, true);
 }
 
 void tagFailed()
 {
   digitalWrite(RED_PIN, HIGH);
+  na.writeDigOut(RED_LIGHT, true);
   startResultTime = millis();
 }
 
 void setKeyLock(bool keyON)
 {
   if (keyON)  {
-	  digitalWrite(RED_PIN, HIGH);
+	  // digitalWrite(RED_PIN, HIGH);
     if (naminoReady)  {
       na.writeRele(true);
     }
   }
   else  {
-	  digitalWrite(RED_PIN, LOW);    
+	  // digitalWrite(RED_PIN, LOW);    
     if (naminoReady)  {
       na.writeRele(false);
     }
@@ -266,9 +274,11 @@ bool setBlink(bool blinkON)
 {
   if (blinkON)  {
 	  digitalWrite(YELLOW_PIN, HIGH);    
+    na.writeDigOut(YELLOW_LIGHT, true);
   }
   else  {
 	  digitalWrite(YELLOW_PIN, LOW);    
+    na.writeDigOut(YELLOW_LIGHT, false);
   }
   // Serial.printf("Set Led Blink: [%d]\n", blinkON);
   return not blinkON;
