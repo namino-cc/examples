@@ -5,6 +5,11 @@
   https://www.maffucci.it/2021/02/08/arduino-utilizzo-delllcd1602-keypad-shield-della-keyestudio/
   https://wiki.keyestudio.com/Ks0256_keyestudio_LCD1602_Expansion_Shield
   https://forum.arduino.cc/t/lcd-keypad-shield-for-arduino-lcd-1602-wiring-by-botton-side/177192
+
+  calibration:
+  1. autozero 1 minute, unload any weights
+  2. set 312 grams on left, press LEFT
+  3. set 312 grams on right, press RIGHT
 */
 
 // include the library code
