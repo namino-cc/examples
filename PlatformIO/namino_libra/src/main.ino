@@ -39,25 +39,27 @@ LiquidCrystal lcd(RS, EN, D4, D5, D6, D7);
 #define LCD_HOME(r)                 lcd.setCursor(0,r);
 #define ABS(x)                      ((x)>0.0?(x):-(x))
 #define FULL_SCALE                  (5)      
-#define WEIGHT_NET_L                (ABS(weightLeftM - weightLeftBias) * weightLeftRamp)
-#define WEIGHT_NET_R                (ABS(weightRightM - weightRightBias) * weightRightRamp)
-#define AUTOZERO_COUNT_MAX          (200)
+#define WEIGHT_NET_L                ((weightLeftM - weightLeftBias) * (312.0 / (weightLeftRamp - weightLeftBias)))
+#define WEIGHT_NET_R                ((weightRightM - weightRightBias) * (312.0 / (weightRightRamp - weightRightBias)))
+#define AUTOZERO_COUNT_MAX          (100)
+#define COUNT_1                     (25)
+#define COUNT_2                     (10)
 
-float weightLeftM = 0;
-float weightLeftBias = 0;
-float weightLeftRamp = 372.0 / 2.85;
-float weightRightM = 0;
-float weightRightBias = 0;
-float weightRightRamp = 372.0 / 2.85; // float weightRightRamp = 372.0 / 1.85; mect cal weight
-float weightTol = 150.0;
-int   autozeroCount = AUTOZERO_COUNT_MAX;
-bool  winLock = false;
+float  weightLeftM = 0;
+float  weightLeftBias = 0;
+double weightLeftRamp = 0;
+float  weightRightM = 0;
+float  weightRightBias = 0;
+double weightRightRamp = 0;
+float  weightTol = 20.0;
+int    autozeroCount = AUTOZERO_COUNT_MAX;
 
-unsigned long lastTiming = millis();
+unsigned long lastTiming        = millis();
 unsigned long lastDisplayTiming = millis();
-bool          indicator = false;
-bool          configAN = true;
-unsigned long msAN = millis();
+bool          indicatorGreen    = false;
+bool          indicatorRed      = false;
+bool          configAN          = true;
+unsigned long msAN              = millis();
 char          buf[64];
 
 namino_rosso nr = namino_rosso();
@@ -120,8 +122,9 @@ void autozero() {
       LCD_HOME(1);
       sprintf(buf, "  auto zero %d  ", autozeroCount);
       lcd.print(buf);
-      weightLeftM = (nr.readLoadCell(1) + weightLeftM) / AUTOZERO_COUNT_MAX;
-      weightRightM = (nr.readLoadCell(2) + weightRightM) / AUTOZERO_COUNT_MAX;
+      //weightLeftM = (nr.readLoadCell(1) + weightLeftM * (AUTOZERO_COUNT_MAX - 1)) / AUTOZERO_COUNT_MAX;
+      //weightRightM = (nr.readLoadCell(2) + weightRightM * (AUTOZERO_COUNT_MAX - 1)) / AUTOZERO_COUNT_MAX;
+      weightMeasure();
       sprintf(buf, "(1) #%d LM %5.2f RM %5.2f", autozeroCount, weightLeftM, weightRightM);
       Serial.println(buf);
     } else if (autozeroCount == 1) {
@@ -141,9 +144,56 @@ void autozero() {
 }
 
 void weightMeasure() {
+  if (nr.isReady()) {
+    if (autozeroCount > 0) {
+      if (AUTOZERO_COUNT_MAX - autozeroCount < 10) {
+        weightLeftM = nr.readLoadCell(1);
+      } else {
+        //Serial.println("weightMeasure autozeroCount L");
+        weightLeftM = (nr.readLoadCell(1) + weightLeftM * (AUTOZERO_COUNT_MAX - 1)) / AUTOZERO_COUNT_MAX;
+      }
+    } else if (ABS(weightLeftM - nr.readLoadCell(1)) < 100) {
+      weightLeftM = (nr.readLoadCell(1) + weightLeftM * (COUNT_1 - 1)) / COUNT_1;
+    } else if (ABS(weightLeftM - nr.readLoadCell(1)) < 200) {
+      weightLeftM = (nr.readLoadCell(1) + weightLeftM * (COUNT_2 - 1)) / COUNT_2;
+    } else if (ABS(weightLeftM - nr.readLoadCell(1)) >= 200) {
+      weightLeftM = nr.readLoadCell(1);
+    }
+
+    if (autozeroCount > 0) {
+      if (AUTOZERO_COUNT_MAX - autozeroCount < 10) {
+        weightRightM = nr.readLoadCell(2);
+      } else {
+        //Serial.println("weightMeasure autozeroCount R");
+        weightRightM = (nr.readLoadCell(2) + weightRightM * (AUTOZERO_COUNT_MAX - 1)) / AUTOZERO_COUNT_MAX;
+      }
+    } else if (ABS(weightRightM - nr.readLoadCell(2)) < 100) {
+      weightRightM = (nr.readLoadCell(2) + weightRightM * (COUNT_1 - 1)) / COUNT_1;
+    } else if (ABS(weightRightM - nr.readLoadCell(2)) < 200) {
+      weightRightM = (nr.readLoadCell(2) + weightRightM * (COUNT_2 - 1)) / COUNT_2;
+    } else if (ABS(weightRightM - nr.readLoadCell(2)) >= 200) {
+      weightRightM = nr.readLoadCell(2);
+    } 
+  }
+}
+
+void calibrateL() {
   if (nr.isReady() && autozeroCount == 0) {
-      weightLeftM = (nr.readLoadCell(1) + weightLeftM) / AUTOZERO_COUNT_MAX;
-      weightRightM = (nr.readLoadCell(2) + weightRightM) / AUTOZERO_COUNT_MAX;
+      weightLeftRamp = weightLeftM;
+      Serial.print(" weightLeftBias: ");
+      Serial.print(weightLeftBias);
+      Serial.print(" weightLeftRamp: ");
+      Serial.println(weightLeftRamp);
+  }
+}
+
+void calibrateR() {
+  if (nr.isReady() && autozeroCount == 0) {
+      weightRightRamp = weightRightM;
+      Serial.print(" weightRightBias: ");
+      Serial.print(weightRightBias);
+      Serial.print(" weightRightRamp: ");
+      Serial.println(weightRightRamp);
   }
 }
 
@@ -172,26 +222,34 @@ void weightMeasure() {
 // }
 
 void displayMeasure() {
-  if (nr.isReady() && autozeroCount == 0 && !winLock) {
+  if (nr.isReady() && autozeroCount == 0) {
     LCD_HOME(0);
     sprintf(buf, "<L%5.0f %5.0f R>", WEIGHT_NET_L, WEIGHT_NET_R);
     lcd.print(buf);
 
-    sprintf(buf, "MLT %5.2f MRT %5.2f", WEIGHT_NET_L, WEIGHT_NET_R);
+    sprintf(buf, "MLT %f MRT %f", WEIGHT_NET_L, WEIGHT_NET_R);
+    Serial.println(buf); // debug
+    sprintf(buf, "weightLeftM %f", weightLeftM);
+    Serial.println(buf); // debug
+    sprintf(buf, "weightLeftBias %f", weightLeftBias);
+    Serial.println(buf); // debug
+    sprintf(buf, "weightLeftRamp %f", weightLeftRamp);
     Serial.println(buf); // debug
 
     LCD_HOME(1);
     float delta = ABS(WEIGHT_NET_R - WEIGHT_NET_L);
-    if (delta < weightTol && (WEIGHT_NET_L > 50 && WEIGHT_NET_R > 50)) {
+    if (delta < weightTol && (WEIGHT_NET_L > 20 && WEIGHT_NET_R > 20)) {
       sprintf(buf, " HAI VINTO VINTO! ");
-      indicator = true;
-      winLock = true;
+      indicatorGreen = true;
+      indicatorRed = false;
     } else if (WEIGHT_NET_L < WEIGHT_NET_R) {
       sprintf(buf, "%+5.0f g ------->", delta);
-      indicator = false;
+      indicatorGreen = false;
+      indicatorRed = true;
     } else if (WEIGHT_NET_L > WEIGHT_NET_R) {
       sprintf(buf, "<------- %+5.0f g  ", delta);
-      indicator = false;
+      indicatorGreen = false;
+      indicatorRed = true;
     } else {
       // nothing
     }
@@ -247,37 +305,41 @@ void loop() {
     lastTiming = millis();
   } else if (decodeButton(button_v) == 'U') {
     // lamp test on
-    Serial.println("lamp test on");
-    indicator = true;
+    Serial.println("lamp test toggle");
+    indicatorGreen = !indicatorGreen;
+    indicatorRed = false;
   } else if (decodeButton(button_v) == 'D') {
-    // lamp test off
-    Serial.println("lamp test off");
-    indicator = false;
-    winLock = false;
+    //
   } else if (decodeButton(button_v) == 'L') {
-    // win lock off
-    Serial.println("win lock off");
-    indicator = false;
-    winLock = false;
+    Serial.println("calibrate 312 g on left");
+    calibrateL();
+  } else if (decodeButton(button_v) == 'R') {
+    Serial.println("calibrate 312 g on right");
+    calibrateR();
   }
-  nr.writeDigOut(1, indicator);
+  nr.writeDigOut(1, indicatorGreen);
+  nr.writeDigOut(2, indicatorRed);
 
-  if (!winLock) {
-    if (millis() - lastTiming > 1000 * 30) {
-      displayBanner();
-      lastTiming = millis();
-    } else {
-      weightMeasure();
-      if (millis() - lastDisplayTiming > 1000 * 2) {
-        displayMeasure();
-        lastDisplayTiming = millis();
-      }
+  if ((autozeroCount == 0) && (millis() - lastTiming > 1000 * 30)) {
+    displayBanner();
+    lastTiming = millis();
+  } else {
+    weightMeasure();
+    if (millis() - lastDisplayTiming > 1000 * 2) {
+      displayMeasure();
+      lastDisplayTiming = millis();
     }
   }
 
   // nr.showRegister();    // debug function
   // In the loop() there must be the following function, which allow the exchange of values with the industrial side board
   nr.writeAllRegister();
+
+  // reset game
+  if (weightLeftM < 25 && weightRightM < 25) {
+    indicatorGreen = false;
+    indicatorRed = true;
+  }
 
   delay(250);  
 }
