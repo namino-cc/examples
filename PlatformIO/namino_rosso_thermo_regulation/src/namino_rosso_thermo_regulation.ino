@@ -32,9 +32,34 @@ SOFTWARE.
 
 #include <Arduino.h>
 #include <SPI.h>
+#include <Wire.h>
 #include <Mapf.h>
 
 #include "./namino_rosso.h"
+
+typedef enum {
+  TEMP    = 1001,
+  HUMI    = 1002,
+  CO2     = 1003,
+  VOC     = 1005,
+  PM1_0   = 1006,
+  PM2_5   = 1007,
+  PM4_0   = 1008,
+  PM10    = 1009,
+} SENSORS_MODBUS_REGISTERS;
+
+#define   NAMINO_MODBUS_RX        (44)
+#define   NAMINO_MODBUS_TX        (43)
+#define   NAMINO_MODBUS_RTS       (15)
+#define   NAMINO_MODBUS_BAUD      (38400)
+#define   MODBUS_THIS_NODE_ID     (1)
+#define   MODBUS_TPAC_ID          (10)
+#define   MODBUS_DISPLAY_ID       (2)
+#define   MODBUS_SENSORS_ID       (43)
+
+#include <ModbusRTU.h>
+
+ModbusRTU mb;
 
 #ifdef NAMINO_ROSSO_BOARD
 #undef NAMINO_ROSSO_BOARD
@@ -115,10 +140,19 @@ void setup() {
   delay(5000);  // mandatory delay
 
   Serial.println();
-  Serial.println("=========================================");
-  Serial.println("## NAMINO ROSSO LAMP THERMO REGULATION ##");
-  Serial.println("=========================================");
+  Serial.println("========================================================");
+  Serial.println("## NAMINO ROSSO LAMP THERMO REGULATION, MODBUS MASTER ##");
+  Serial.println("========================================================");
   Serial.println();
+  Serial.print("NAMINO_MODBUS_RX: ");
+  Serial.println(NAMINO_MODBUS_RX);
+  Serial.print("NAMINO_MODBUS_TX: ");
+  Serial.println(NAMINO_MODBUS_TX);
+  Serial.print("NAMINO_MODBUS_RTS: ");
+  Serial.println(NAMINO_MODBUS_RTS);
+  Serial.print("MODBUS_SENSORS_ID: ");
+  Serial.println(MODBUS_SENSORS_ID);
+  Serial.println("-------------------");
   Serial.flush();
 
   pinMode(MAX7219_DIN, OUTPUT);   // serial data-in
@@ -134,7 +168,20 @@ void setup() {
   // Opening/closing of communication / initialization of the industrial side interface
   nr.begin(800000U, MISO, MOSI, SCK, SS);
 
+  // modbus master
+  Serial1.begin(NAMINO_MODBUS_BAUD, SERIAL_8N1, NAMINO_MODBUS_RX, NAMINO_MODBUS_TX);
+  mb.begin(&Serial1, NAMINO_MODBUS_RTS);
+  mb.master();
+
   delay(2000);
+}
+
+// Check & wait if modbus transaction is active
+void mbWait() {
+  while (mb.slave()) {
+    mb.task();
+    delay(10);
+  }
 }
 
 float round2(float value) {
@@ -148,6 +195,15 @@ void loop() {
   float tpot = mapf(cpot, 0, 4096, 20, 60);
   setPoint = tpot;
   float_t tc = 0;
+
+  uint16_t modbus_temp  = 0;
+  uint16_t modbus_humi  = 0;
+  uint16_t modbus_co2   = 0;
+  uint16_t modbus_voc   = 0;
+  uint16_t modbus_pm1_0 = 0;
+  uint16_t modbus_pm2_5 = 0;
+  uint16_t modbus_pm4_0 = 0;
+  uint16_t modbus_pm10  = 0;
 
   // In the loop() there must be the following functions, which allow the exchange of values with the industrial side board
   nr.readAllRegister();
@@ -166,7 +222,7 @@ void loop() {
     // Reading converted to reference units by the channel with a connected thermocouple and/or thermometric probe.
     tc = nr.readPt1000(1);
     // Serial.printf("readPt1000(1) %f RO_ANALOG_IN_CH01 %d setPoint %f\n", tc, nr.loadRegister(RO_ANALOG_IN_CH01), setPoint);
-    Serial.printf("vpot: %3.6f V | T set: %3.6f C | T get: %3.6f C\n", vpot, setPoint, tc);
+    // Serial.printf("vpot: %3.6f V | T set: %3.6f C | T get: %3.6f C\n", vpot, setPoint, tc);
     if (tc < setPoint) {
       nr.writeRele(true);  // Relay status setting.
     } else {
@@ -190,5 +246,31 @@ void loop() {
   sprintf(buf, "%4.0f%4.0f", tc * 10.0, setPoint * 10.0);
   display(String(buf));
 
-  delay(500);
+  if (!mb.slave()) {
+    mb.readHreg(MODBUS_SENSORS_ID, SENSORS_MODBUS_REGISTERS::TEMP,  &modbus_temp);
+    mbWait();
+    mb.readHreg(MODBUS_SENSORS_ID, SENSORS_MODBUS_REGISTERS::HUMI,  &modbus_humi);
+    mbWait();
+    mb.readHreg(MODBUS_SENSORS_ID, SENSORS_MODBUS_REGISTERS::CO2,   &modbus_co2);
+    mbWait();
+    mb.readHreg(MODBUS_SENSORS_ID, SENSORS_MODBUS_REGISTERS::VOC,   &modbus_voc);
+    mbWait();
+    mb.readHreg(MODBUS_SENSORS_ID, SENSORS_MODBUS_REGISTERS::PM1_0, &modbus_pm1_0);
+    mbWait();
+    mb.readHreg(MODBUS_SENSORS_ID, SENSORS_MODBUS_REGISTERS::PM2_5, &modbus_pm2_5);
+    mbWait();
+    mb.readHreg(MODBUS_SENSORS_ID, SENSORS_MODBUS_REGISTERS::PM4_0, &modbus_pm4_0);
+    mbWait();
+    mb.readHreg(MODBUS_SENSORS_ID, SENSORS_MODBUS_REGISTERS::PM10,  &modbus_pm10);
+    mbWait();
+    // only debug
+    Serial.printf("temp: %d | humi: %d | co2: %d | voc: %d | pm1_0: %d | pm2_5: %d | pm4_0: %d | pm10: %d\n", 
+                  modbus_temp, modbus_humi, modbus_co2, modbus_voc, modbus_pm1_0, modbus_pm2_5, modbus_pm4_0, modbus_pm10);
+    mbWait();
+  }
+
+  mb.task();
+  yield();
+
+  delay(30);
 }
