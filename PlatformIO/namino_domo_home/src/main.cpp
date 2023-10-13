@@ -237,7 +237,7 @@ void touch_calibrate()
   myGLCD.setCursor(20, 0);
   myGLCD.setTextFont(2);
   myGLCD.setTextSize(1);
-  myGLCD.setTextColor(TFT_WHITE, TFT_BLACK);
+  myGLCD.setTextColor(TFT_WHITE, TFT_BLACK, true);
 
   myGLCD.println("Touch corners as indicated");
 
@@ -248,7 +248,7 @@ void touch_calibrate()
 
   myGLCD.fillScreen(TFT_BLACK);
   
-  myGLCD.setTextColor(TFT_GREEN, TFT_BLACK);
+  myGLCD.setTextColor(TFT_GREEN, TFT_BLACK, true);
   myGLCD.println("Calibration complete!");
   if (writeTouchCalibration(calData))  {
     myGLCD.println("Calibration Data saved");
@@ -358,8 +358,8 @@ void setup() {
   Serial.println("Starting TFT Display");
   myGLCD.init();
   myGLCD.setRotation(1);
-  myGLCD.fillScreen(TFT_BLACK);                 //  fill the screen with black color
-  myGLCD.setTextColor(TFT_WHITE, TFT_BLACK);    //  set the text color
+  myGLCD.fillScreen(TFT_BLACK);                       //  fill the screen with black color
+  myGLCD.setTextColor(TFT_WHITE, TFT_BLACK, true);    //  set the text color
   
   // Calibrate the touch screen and retrieve the scaling factors
   Serial.println("Retrieving Calibration Data");
