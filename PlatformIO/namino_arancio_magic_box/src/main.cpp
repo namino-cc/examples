@@ -119,7 +119,6 @@ void loop() {
   // Read Industrial Registers
   na.readAllRegister();
   naminoReady = na.isReady();
-  naLifeTime = na.readLifeTime();
 
   // Check Analog In Configuration
   if (configANIN && naminoReady) {
@@ -131,11 +130,12 @@ void loop() {
     na.writeRegister(WR_ANALOG_OUT_CH01_CONF, ANALOG_OUT_CH01_CONF_VALUES::OUT_CH01_VOLTAGE);
     na.writeAnalogOut(0.0); // output voltage
     Serial.println("NR config completed");
-    Serial.printf("fwVersion: [0x%04x] boardType: [0x%04x] LifeTime: [%d]\n", na.fwVersion(), na.boardType(), naLifeTime);
+    Serial.printf("fwVersion: [0x%04x] boardType: [0x%04x] LifeTime: [%d]\n", na.fwVersion(), na.boardType(), na.readLifeTime());
     configANIN = false;
   }
 
   if (naminoReady)  {
+    naLifeTime = na.readLifeTime();
     // Reading Keylock Status and setting Keylock Light
     keyLocked = na.readDigIn(KEYLOCK_IN);
     if (keyLocked)  {
@@ -146,6 +146,18 @@ void loop() {
       // White Light must be ON if Keylock is OFF
       na.writeDigOut(WHITE_LIGHT, true);
     }
+  }
+  else  {
+    // Namino not ready
+    naLifeTime = 0;
+    Serial.print("F");
+    if (digitalRead(RED_PIN))    {
+      digitalWrite(RED_PIN, LOW);
+    }
+    else  {
+      digitalWrite(RED_PIN, HIGH);
+    }
+    return;
   }
 
   // Switch Off Keylock
