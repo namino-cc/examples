@@ -57,6 +57,11 @@ typedef enum {
   PM10    = 1009,
 } SENSORS_MODBUS_REGISTERS;
 
+typedef enum {
+  TEMP_GET    = 1010,
+  TEMP_SET    = 1011,
+} THERMOREGULATION_MODBUS_REGISTERS;
+
 #define   NAMINO_MODBUS_RX        (44)
 #define   NAMINO_MODBUS_TX        (43)
 #define   NAMINO_MODBUS_RTS       (15)
@@ -66,11 +71,6 @@ typedef enum {
 #include <ModbusRTU.h>
 
 ModbusRTU mb;
-
-bool cbWrite(Modbus::ResultCode event, uint16_t transactionId, void* data) {
-  Serial.printf_P("Request result: 0x%02X, Mem: %d\n", event, ESP.getFreeHeap());
-  return true;
-}
 
 bool readTouchCalibration(uint16_t *calData)
 {
@@ -332,9 +332,6 @@ void setup() {
   delay(2000);
 
   Serial1.begin(NAMINO_MODBUS_BAUD, SERIAL_8N1, NAMINO_MODBUS_RX, NAMINO_MODBUS_TX);
-  Serial1.setRxBufferSize(2048);
-  Serial1.setTxBufferSize(2048);
-  Serial1.setRxFIFOFull(1);
   mb.begin(&Serial1, NAMINO_MODBUS_RTS);
   mb.slave(NAMINO_MODBUS_NODE_ID);
 
@@ -347,6 +344,8 @@ void setup() {
   mb.addHreg(SENSORS_MODBUS_REGISTERS::PM2_5);
   mb.addHreg(SENSORS_MODBUS_REGISTERS::PM4_0);
   mb.addHreg(SENSORS_MODBUS_REGISTERS::PM10);
+  mb.addHreg(THERMOREGULATION_MODBUS_REGISTERS::TEMP_GET);
+  mb.addHreg(THERMOREGULATION_MODBUS_REGISTERS::TEMP_SET);
 
   // Deselect Micro Chip Select
   pinMode(CS_MICRO, OUTPUT);
@@ -430,6 +429,27 @@ void loop() {
   uint16_t modbus_pm2_5 = 0;
   uint16_t modbus_pm4_0 = 0;
   uint16_t modbus_pm10 = 0;
+  uint16_t modbus_tget = 0;
+  uint16_t modbus_tset = 0;
+
+  modbus_temp = mb.Hreg(SENSORS_MODBUS_REGISTERS::TEMP);
+  modbus_humi = mb.Hreg(SENSORS_MODBUS_REGISTERS::HUMI);
+  modbus_co2 = mb.Hreg(SENSORS_MODBUS_REGISTERS::CO2);
+  modbus_voc = mb.Hreg(SENSORS_MODBUS_REGISTERS::VOC);
+  modbus_pm1_0 = mb.Hreg(SENSORS_MODBUS_REGISTERS::PM1_0);
+  modbus_pm2_5 = mb.Hreg(SENSORS_MODBUS_REGISTERS::PM2_5);
+  modbus_pm4_0 = mb.Hreg(SENSORS_MODBUS_REGISTERS::PM4_0);
+  modbus_pm10 = mb.Hreg(SENSORS_MODBUS_REGISTERS::PM10);
+  modbus_tget = mb.Hreg(THERMOREGULATION_MODBUS_REGISTERS::TEMP_GET);
+  modbus_tset = mb.Hreg(THERMOREGULATION_MODBUS_REGISTERS::TEMP_SET);
+
+  // only debug
+  Serial.printf("temp: %d | humi: %d | co2: %d | voc: %d | pm1_0: %d | pm2_5: %d | pm4_0: %d | pm10: %d | Tget %d | Tset %d\n", 
+                modbus_temp, modbus_humi, modbus_co2, modbus_voc, modbus_pm1_0, modbus_pm2_5, modbus_pm4_0, modbus_pm10, modbus_tget, modbus_tset);
+
+  mb.task();
+  yield();
+  delay(300);
 
   // limit loop period
   if (abs( (long long) (theTime - lastLoop)) < LOOP_PERIOD)  {
@@ -499,48 +519,48 @@ void loop() {
   }
   // Display data
   uint16_t ry = 0;
-  sprintf(buf, "TC    %4.1f C", (float)(random(100) / (random(50) + 1)));  // R1001 
+  sprintf(buf, "TC    %4.1f C", modbus_temp / 10.0);  // R1001 
   printText(0, ry, buf, 2, 1);
   Serial.print(buf); 
 
   ry += 25; 
-  sprintf(buf, "HR    %4.1f %%", 21.1); // R1002 
+  sprintf(buf, "HR    %4.1f %%", modbus_humi / 10.0); // R1002 
   printText(0, ry, buf, 2, 1);
   Serial.print(buf);
 
   ry += 25;
-  sprintf(buf, "CO2   %4.1f     Tget %3.1f", 32.3, 15.0);  // R1003
+  sprintf(buf, "CO2  %5.0f ppm Tget %3.1f C", modbus_co2 / 1.0, modbus_tget / 10.0);  // R1003 --> to float
   printText(0, ry, buf, 2, 1);
   Serial.print(buf);
 
   ry += 25;
-  sprintf(buf, "VOC   %4.1f     Tset %3.1f", 54.5, 30.1); // R1005
+  sprintf(buf, "VOC  %5.0f     Tset %3.1f C", modbus_voc / 1.0, modbus_tset / 10.0); // R1005 --> to float
   printText(0, ry, buf, 2, 1);
   Serial.print(buf);
 
   ry += 25;
-  sprintf(buf, "PM1.0 %4.1f", 65.6); // R1006
+  sprintf(buf, "PM1.0 %4.1f ppm", modbus_pm1_0 / 10.0); // R1006
   printText(0, ry, buf, 2, 1);
   Serial.print(buf);
   
   ry += 25;
-  sprintf(buf, "PM2.5 %4.1f", 78.9); // R1007
+  sprintf(buf, "PM2.5 %4.1f ppm", modbus_pm2_5 / 10.0); // R1007
   printText(0, ry, buf, 2, 1);
   Serial.print(buf);
   
   ry += 25;
-  sprintf(buf, "PM4.0 %4.1f", 10.0); // R1008
+  sprintf(buf, "PM4.0 %4.1f ppm", modbus_pm4_0 / 10.0); // R1008
   printText(0, ry, buf, 2, 1);
   Serial.print(buf);
 
   ry += 25;
-  sprintf(buf, "PM10  %4.1f", 10.0); // R1009
+  sprintf(buf, "PM10  %4.1f ppm", modbus_pm10 / 10.0); // R1009
   printText(0, ry, buf, 2, 1);
   Serial.print(buf);
 
   if (distances != nullptr) { 
     ry += 25;
-    sprintf(buf, "CM    %4.1f", distances[0]);
+    sprintf(buf, "DIST %4.1f cm", distances[0]);
     printText(0, ry, buf, 2, 1);
     Serial.print(buf);
   }
@@ -576,17 +596,5 @@ void loop() {
   // }
 
   nr.writeAllRegister();
-
-  mb.Hreg(SENSORS_MODBUS_REGISTERS::TEMP, modbus_temp);
-  mb.Hreg(SENSORS_MODBUS_REGISTERS::HUMI, modbus_humi);
-  mb.Hreg(SENSORS_MODBUS_REGISTERS::CO2, modbus_co2);
-  mb.Hreg(SENSORS_MODBUS_REGISTERS::VOC, modbus_voc);
-  mb.Hreg(SENSORS_MODBUS_REGISTERS::PM1_0, modbus_pm1_0);
-  mb.Hreg(SENSORS_MODBUS_REGISTERS::PM2_5, modbus_pm2_5);
-  mb.Hreg(SENSORS_MODBUS_REGISTERS::PM4_0, modbus_pm4_0);
-  mb.Hreg(SENSORS_MODBUS_REGISTERS::PM10, modbus_pm10);
-
-  mb.task();
-  yield();
 }
 

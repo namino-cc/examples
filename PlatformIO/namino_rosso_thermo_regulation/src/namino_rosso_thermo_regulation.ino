@@ -48,6 +48,11 @@ typedef enum {
   PM10    = 1009,
 } SENSORS_MODBUS_REGISTERS;
 
+typedef enum {
+  TEMP_GET    = 1010,
+  TEMP_SET    = 1011,
+} THERMOREGULATION_MODBUS_REGISTERS;
+
 #define   NAMINO_MODBUS_RX        (44)
 #define   NAMINO_MODBUS_TX        (43)
 #define   NAMINO_MODBUS_RTS       (15)
@@ -196,14 +201,14 @@ void loop() {
   setPoint = tpot;
   float_t tc = 0;
 
-  uint16_t modbus_temp  = 0;
-  uint16_t modbus_humi  = 0;
-  uint16_t modbus_co2   = 0;
-  uint16_t modbus_voc   = 0;
-  uint16_t modbus_pm1_0 = 0;
-  uint16_t modbus_pm2_5 = 0;
-  uint16_t modbus_pm4_0 = 0;
-  uint16_t modbus_pm10  = 0;
+  uint16_t modbus_temp  = 11;
+  uint16_t modbus_humi  = 22;
+  uint16_t modbus_co2   = 33;
+  uint16_t modbus_voc   = 44;
+  uint16_t modbus_pm1_0 = 55;
+  uint16_t modbus_pm2_5 = 66;
+  uint16_t modbus_pm4_0 = 77;
+  uint16_t modbus_pm10  = 88;
 
   // In the loop() there must be the following functions, which allow the exchange of values with the industrial side board
   nr.readAllRegister();
@@ -247,6 +252,7 @@ void loop() {
   display(String(buf));
 
   if (!mb.slave()) {
+    // read from modbus sensors id
     mb.readHreg(MODBUS_SENSORS_ID, SENSORS_MODBUS_REGISTERS::TEMP,  &modbus_temp);
     mbWait();
     mb.readHreg(MODBUS_SENSORS_ID, SENSORS_MODBUS_REGISTERS::HUMI,  &modbus_humi);
@@ -264,13 +270,37 @@ void loop() {
     mb.readHreg(MODBUS_SENSORS_ID, SENSORS_MODBUS_REGISTERS::PM10,  &modbus_pm10);
     mbWait();
     // only debug
-    Serial.printf("temp: %d | humi: %d | co2: %d | voc: %d | pm1_0: %d | pm2_5: %d | pm4_0: %d | pm10: %d\n", 
-                  modbus_temp, modbus_humi, modbus_co2, modbus_voc, modbus_pm1_0, modbus_pm2_5, modbus_pm4_0, modbus_pm10);
+    Serial.printf("READ  temp: %d | humi: %d | co2: %d | voc: %d | pm1_0: %d | pm2_5: %d | pm4_0: %d | pm10: %d\n", 
+                   modbus_temp, modbus_humi, modbus_co2, modbus_voc, modbus_pm1_0, modbus_pm2_5, modbus_pm4_0, modbus_pm10);
+    // write to modbus display id
+    mb.writeHreg(MODBUS_DISPLAY_ID, SENSORS_MODBUS_REGISTERS::TEMP, modbus_temp);
     mbWait();
+    mb.writeHreg(MODBUS_DISPLAY_ID, SENSORS_MODBUS_REGISTERS::HUMI, modbus_humi);
+    mbWait();
+    mb.writeHreg(MODBUS_DISPLAY_ID, SENSORS_MODBUS_REGISTERS::CO2, modbus_co2);
+    mbWait();;
+    mb.writeHreg(MODBUS_DISPLAY_ID, SENSORS_MODBUS_REGISTERS::VOC, modbus_voc);
+    mbWait();
+    mb.writeHreg(MODBUS_DISPLAY_ID, SENSORS_MODBUS_REGISTERS::PM1_0, modbus_pm1_0);
+    mbWait();
+    mb.writeHreg(MODBUS_DISPLAY_ID, SENSORS_MODBUS_REGISTERS::PM2_5, modbus_pm2_5);
+    mbWait();
+    mb.writeHreg(MODBUS_DISPLAY_ID, SENSORS_MODBUS_REGISTERS::PM4_0, modbus_pm4_0);
+    mbWait();
+    mb.writeHreg(MODBUS_DISPLAY_ID, SENSORS_MODBUS_REGISTERS::PM10, modbus_pm10);
+    mbWait();
+    mb.writeHreg(MODBUS_DISPLAY_ID, THERMOREGULATION_MODBUS_REGISTERS::TEMP_GET, (uint16_t)(tc * 10.0));
+    mbWait();
+    mb.writeHreg(MODBUS_DISPLAY_ID, THERMOREGULATION_MODBUS_REGISTERS::TEMP_SET, (uint16_t)(setPoint * 10.0));
+    mbWait();
+    // only debug
+    Serial.printf("WRITE temp: %d | humi: %d | co2: %d | voc: %d | pm1_0: %d | pm2_5: %d | pm4_0: %d | pm10: %d | Tget: %d | Tset: %d\n", 
+                   modbus_temp, modbus_humi, modbus_co2, modbus_voc, modbus_pm1_0, modbus_pm2_5, modbus_pm4_0, modbus_pm10,
+                   (uint16_t)(tc * 10.0), (uint16_t)(setPoint * 10.0));
   }
 
   mb.task();
   yield();
 
-  delay(30);
+  delay(200);
 }
