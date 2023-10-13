@@ -1,0 +1,16 @@
+{
+	"folders": [
+		{
+			"name": "namino_arancio_magic_box",
+			"path": "."
+		}
+	],
+	"settings": {
+		"files.associations": {
+			"array": "cpp",
+			"string_view": "cpp",
+			"initializer_list": "cpp",
+			"utility": "cpp"
+		}
+	}
+}

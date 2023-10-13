@@ -12,10 +12,13 @@
 namino_arancio  na = namino_arancio();
 bool            configANIN = true;
 bool            naminoReady = false;
+bool            naminoErr = false;
+int             naminoErrors = 0;
 
 // RC522 Reader Instance
 MFRC522 mfrc522(CS_PIN, RST_PIN);   // Create MFRC522 instance.
 MFRC522::MIFARE_Key key;
+int             tagReaderErrors = 0;
 
 // Time counters (in millis)
 unsigned long lastTagdRead = 0;
@@ -27,7 +30,26 @@ unsigned long startResultTime = 0;
 // Status Flags
 bool          readerOk = false;
 bool          blinkOn = false;
+int           totalAttempts = 0;
+int           successAttempts = 0;
+char          printLine[LINE_LEN + 1];
 
+
+// Tag Items
+uint64_t      tagCodes[TAG_ITEMS] =  {
+  2737845411,
+  3711343923,
+  3711716611,
+  3712263715,
+  3712378723,
+  3712785523,
+  3712971107,
+  3712972387,
+  3713360963,
+  3714530083
+};
+// Winner codes (different for each attempt)
+uint64_t      winnerCodes[WINNERS_TAG];
 
 void setup() {
   // put your setup code here, to run once:
@@ -72,7 +94,7 @@ void setup() {
   // MFRC522 Setup
   Serial.println("Starting RFID Reader");
   mfrc522.PCD_Init(); // Init MFRC522 card
-  delay(4000);
+  delay(2000);
 
   // Testing MFRC522 Reader
   if (mfrc522.PCD_PerformSelfTest())  {
@@ -90,22 +112,19 @@ void setup() {
   }
 
   // Init Namino Arancio Board
+  Serial.println("Starting Namino industrial Board");
+  delay(2000);
   // reset namino microcontroller
   na.resetSignalMicroprocessor();
   na.begin(800000U, MISO, MOSI, SCK, SS);
-  delay(2000);
-  // Starting
-  digitalWrite(GREEN_PIN, LOW);    
-  digitalWrite(RED_PIN, LOW);    
-  digitalWrite(YELLOW_PIN, LOW);    
+  Serial.println("Waiting Namino industrial Board Analog Configuration");
+  randomSeed(millis());
 }
 
 void loop() {
   unsigned long theTime = millis();
-  char line[LINE_LEN + 1];
   uint64_t    tagIDLow = 0;
   uint64_t    tagIDHigh = 0;
-  uint32_t    naLifeTime = 0;
   byte        tagID[TAG_LEN];
   bool        keyLocked = true;
 
@@ -129,13 +148,21 @@ void loop() {
     na.writeRegister(WR_ANALOG_IN_CH04_CONF, ANALOG_IN_CH04_CONF_VALUES::CH04_VOLTAGE);
     na.writeRegister(WR_ANALOG_OUT_CH01_CONF, ANALOG_OUT_CH01_CONF_VALUES::OUT_CH01_VOLTAGE);
     na.writeAnalogOut(0.0); // output voltage
-    Serial.println("NR config completed");
-    Serial.printf("fwVersion: [0x%04x] boardType: [0x%04x] LifeTime: [%d]\n", na.fwVersion(), na.boardType(), na.readLifeTime());
+    Serial.printf("Namino Arancio config completed - fwVersion: [0x%04x] boardType: [0x%04x] LifeTime: [%d]\n", na.fwVersion(), na.boardType(), na.readLifeTime());
     configANIN = false;
+    // Feedbak to User
+    digitalWrite(GREEN_PIN, LOW);    
+    digitalWrite(RED_PIN, LOW);    
+    digitalWrite(YELLOW_PIN, LOW);    
   }
 
   if (naminoReady)  {
-    naLifeTime = na.readLifeTime();
+    // Back from Error
+    if (naminoErr)  {
+      digitalWrite(RED_PIN, LOW);    
+      naminoErr = false;
+      Serial.println("Namino Back ONLINE");    
+    }
     // Reading Keylock Status and setting Keylock Light
     keyLocked = na.readDigIn(KEYLOCK_IN);
     if (keyLocked)  {
@@ -148,14 +175,17 @@ void loop() {
     }
   }
   else  {
-    // Namino not ready
-    naLifeTime = 0;
-    Serial.print("F");
-    if (digitalRead(RED_PIN))    {
-      digitalWrite(RED_PIN, LOW);
-    }
-    else  {
-      digitalWrite(RED_PIN, HIGH);
+    // Namino not ready after IO config
+    if (not configANIN)  {
+      naminoErr = true;
+      naminoErrors++;
+      Serial.println("Namino is OFFLINE");    
+      if (digitalRead(RED_PIN))    {
+        digitalWrite(RED_PIN, LOW);
+      }
+      else  {
+        digitalWrite(RED_PIN, HIGH);
+      }
     }
     return;
   }
@@ -166,7 +196,7 @@ void loop() {
     lastDoorOpened = 0;
   }
 
-  // Led Blinking
+  // Led Blinking (Waiting time for electric lock cooling)
   if (startBlinkTime > 0)  {
       if (BLINK_ON_TIME < (theTime - startBlinkTime))  {
         // Definitely stops the blinking
@@ -192,37 +222,42 @@ void loop() {
 
   // Check RFID Reader
   if (not readerOk)  {
-    Serial.println("*");
+    tagReaderErrors++;
+    Serial.printf("Tag Reader is OFFLINE. Errors:[%d]\n", tagReaderErrors);    
     return;
   }
 
   // Check RFID Presence only if ended result time
+  // Uncomment Keylocked = true when 12V is not connected
+  // keyLocked = true;
   if(keyLocked && startBlinkTime == 0 && mfrc522.PICC_IsNewCardPresent()) { 
     // new tag is available
     lastTagdRead = theTime;
     Serial.println();
+    Serial.println("=====================================");
     if (mfrc522.PICC_ReadCardSerial()) { // NUID has been readed
-      memset(line, 0, LINE_LEN);
+      memset(printLine, 0, LINE_LEN);
       MFRC522::PICC_Type piccType = mfrc522.PICC_GetType(mfrc522.uid.sak);
-      strcat(line, "RFID/NFC Tag Type: ");
-      Serial.print(line);
+      strcat(printLine, "RFID/NFC Tag Type: ");
+      Serial.print(printLine);
 
-      strncpy(line, (char *) mfrc522.PICC_GetTypeName(piccType), LINE_LEN);
-      Serial.println(line);
+      strncpy(printLine, (char *) mfrc522.PICC_GetTypeName(piccType), LINE_LEN);
+      Serial.println(printLine);
 
       // Get Tag ID
-      strcpy(line, "UID:");
-      Serial.print(line);
+      strcpy(printLine, "UID:");
+      Serial.print(printLine);
       // UUID may be 4, 7 or 10 Bytes
       memset(&(tagID[0]), 0, TAG_LEN);
+      memset(printLine, 0, LINE_LEN);
       tagIDLow = 0;
       tagIDHigh = 0;
       for (int i = 0; i < mfrc522.uid.size; i++) {
         // Build Tag ID String
-        char byteStr[5];
+        char byteStr[ITEM_LEN];
         sprintf(byteStr, " %02X", (int) (mfrc522.uid.uidByte[i]) ) ;
         tagID[i] = mfrc522.uid.uidByte[i];
-        strcat(line, byteStr);
+        strcat(printLine, byteStr);
       }
       // Can copy read value byte per byte as the platform is "Little Endian"
       memcpy(&tagIDLow, &(tagID[0]), sizeof(tagIDLow));
@@ -232,19 +267,40 @@ void loop() {
       else  {
         tagIDHigh = 0;
       }
-      Serial.printf("[%s] Len:[%d] Low:[%u] - High:[%u] System Lifetime:[%d]\n", line, mfrc522.uid.size, tagIDLow, tagIDHigh, naLifeTime);
-      mfrc522.PICC_HaltA();     // halt PICC
-      mfrc522.PCD_StopCrypto1(); // stop encryption on PCD
-      // Success Reading Tag
-      tagOK();
+      Serial.printf("[%s] Len:[%d] Low:[%u] - High:[%u] \n", printLine, mfrc522.uid.size, tagIDLow, tagIDHigh);
+      mfrc522.PICC_HaltA();       // halt PICC
+      mfrc522.PCD_StopCrypto1();  // stop encryption on PCD
+      delay(TAG_READ_DELAY);
+      // Generate a new Winners list
+      totalAttempts++;
+      selectWinners();
+      // Search Tag in Winner List
+      bool tagFound = searchCodeInWinners(tagIDLow);
+      // Actuate attempt
+      if (tagFound)  {
+        successAttempts++;
+        tagOK();
+      }
+      else  {
+        tagFailed();      
+      }
+      Serial.flush();
+      // Debug Tag List printout
+      Serial.printf("T.Attempt:[%d] T.Success:[%d] Found:[%s] Winners List:", totalAttempts, successAttempts, (tagFound ? "Y" : "N"));
+      memset(printLine, 0, LINE_LEN);       
+      for (int item = 0; item < WINNERS_TAG; item++)  {
+        char tagString[ITEM_LEN];
+        sprintf(tagString, "[%u] ", winnerCodes[item]);
+        strcat(printLine, tagString);
+      }      
+      Serial.println(printLine);      
+      Serial.println("=====================================");
     }
-  }
-  else  {
-    Serial.print(keyLocked ? "L" : "U");
-    // Serial.printf("Namino Ready:[%s] - Lifetime:[%d]\n", naminoReady ? "1" : "0", na.readLifeTime());
   }
   // Update Industrial Registers
   na.writeAllRegister();
+  // Loop End, show Namino Data
+  Serial.printf("[L:%s R:%d E:%d L:%u]-", keyLocked ? "L" : "U", naminoReady, naminoErrors, na.readLifeTime());
 }
 
 void tagOK()
@@ -294,4 +350,58 @@ bool setBlink(bool blinkON)
   }
   // Serial.printf("Set Led Blink: [%d]\n", blinkON);
   return not blinkON;
+}
+
+void selectWinners()
+{
+  int item = 0; 
+  int attempts = 0;
+  int tagIndexes[WINNERS_TAG];
+  
+  // Clean Winners List
+  for (item = 0; item < WINNERS_TAG; item++)  {
+    winnerCodes[item] = 0;   
+  }
+  // Fill Winners List
+  item = 0;
+  while (item < WINNERS_TAG) {
+    // Find a code Index
+    int randNum = (int) random(TAG_ITEMS);
+    // Get Tag Code from Tag List
+    uint64_t newCode = tagCodes[randNum];
+    // Check if code is already present in Winner List
+    if (not searchCodeInWinners(newCode))  {
+      // Add Code to Winner List
+      winnerCodes[item] = newCode;
+      tagIndexes[item] = randNum;
+      item++;
+    }
+    attempts++;
+  }
+  // debug printout
+  Serial.printf("Winner List Ins.Attps:[%d] W.Ind.List:", attempts);
+  memset(printLine, 0, LINE_LEN);       
+  for (item = 0; item < WINNERS_TAG; item++)  {
+    char tagString[ITEM_LEN];
+    sprintf(tagString, "%d ", tagIndexes[item]);
+    strcat(printLine, tagString);
+  }
+  Serial.println(printLine);
+}
+
+bool  searchCodeInWinners(uint64_t tagCode)
+{
+  int   item = 0; 
+  bool  found = false;
+
+  for (item = 0; item < WINNERS_TAG; item++)  {
+    if (tagCode > 0 && tagCode == winnerCodes[item])  {
+      found = true;
+      break;
+    }
+    else if(winnerCodes[item] == 0)  {
+      break;
+    }
+  }
+  return found;
 }
