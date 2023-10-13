@@ -78,6 +78,7 @@ uint8_t       rele = 0;
 bool          configANOUT = true;
 unsigned long msANOUT = millis();
 float_t       tc = 0;
+uint8_t       loopCount = 0;
 #define AN_OUT_INIT_DELAY_MS  (5 * 1000)
 
 
@@ -251,6 +252,13 @@ void loop() {
   sprintf(buf, "%4.0f%4.0f", tc * 10.0, setPoint * 10.0);
   display(String(buf));
 
+  // display update: fast
+  // modbus update: slow
+  if (++loopCount < 5) {
+    delay(300);
+    return;
+  }
+
   if (!mb.slave()) {
     // read from modbus sensors id
     mb.readHreg(MODBUS_SENSORS_ID, SENSORS_MODBUS_REGISTERS::TEMP,  &modbus_temp);
@@ -302,5 +310,6 @@ void loop() {
   mb.task();
   yield();
 
+  loopCount = 0;
   delay(200);
 }
