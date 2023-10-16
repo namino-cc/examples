@@ -13,6 +13,7 @@
 namino_rosso nr = namino_rosso();
 bool        configANIN = true;
 bool        naminoReady = false;
+bool        screenON = false;
 
 // Application Preferences
 Preferences appPreferences;
@@ -28,12 +29,16 @@ bool          sht41Present = false;
 // TFT Object
 TFT_eSPI myGLCD = TFT_eSPI(); // Invoke custom library
 
+// Modbus RTU
+ModbusRTU mb;
+int mbNodeID = NAMINO_MODBUS_NODE_ID;
+
 // Loop time Counters
-unsigned long lastLoop = 0;
-unsigned long loopCounter = 0;
-unsigned long lastTouch = 0;
-unsigned long lastTime = 0;
-unsigned long lastFieldRead = 0;
+uint32_t lastLoop = 0;                        // Last ended loop in millis()
+uint32_t lastTouch = 0;                       // Last Screen Touch in seconds from Boot
+uint32_t lastRTCReadTime = 0;                 // Last RTC Read in millis()
+uint32_t lastFieldRead = 0;                   // Last field Read in millis()
+uint32_t secsFromBoot = 0;                    // Seconds from Namino Rosso Boot                        
 
 uint32_t      myColor = TFT_BLACK;
 bool          sdCardPresent = false;
@@ -259,12 +264,21 @@ void setup() {
   Serial.println(TFT_DC);  
   Serial.print("TOUCH_CS: ");
   Serial.println(TOUCH_CS);
-  Serial.print("TFT_BACKLIGHT: ");
-  Serial.println(TFT_BACKLIGHT);
+  Serial.print("TFT_BACKLIGHT PIN: ");
+  Serial.println(TFT_BL);
+  Serial.print("CONFIG_ENABLE_BL: ");
+  Serial.println(CONFIG_ENABLE_BL);
+  Serial.print("TFT_SCREEN SAVER SEC: ");
+  Serial.println(TFT_SCREEN_SAVER_SECONDS);
   Serial.print("NAMINO_I2C_SCL: ");
   Serial.println(NAMINO_I2C_SCL);
   Serial.print("NAMINO_I2C_SDA: ");
   Serial.println(NAMINO_I2C_SDA);
+  Serial.print("Modbus RTU Speed: ");
+  Serial.println(NAMINO_MODBUS_BAUD);
+  Serial.print("Modbus RTU Node ID: ");
+  Serial.println(mbNodeID);
+
   Serial.println("-------------------");
   Serial.flush();
   delay(2000);
@@ -273,13 +287,13 @@ void setup() {
   pinMode(CS_MICRO, OUTPUT);
   digitalWrite(CS_MICRO, HIGH);    
 
-  // TFT Init
-  pinMode(TFT_BACKLIGHT, OUTPUT);
-  digitalWrite(TFT_BACKLIGHT, HIGH);
-
   Serial.println("Starting TFT Display");
   myGLCD.init();
   myGLCD.setRotation(1);
+  if (CONFIG_ENABLE_BL && TFT_BL >= 0)  {
+    pinMode(TFT_BL, OUTPUT);
+    digitalWrite(TFT_BL, HIGH);
+  }
   
   // Calibrate the touch screen and retrieve the scaling factors
   Serial.println("Retrieving Calibration Data");
@@ -330,7 +344,6 @@ void setup() {
     // Uncomment to Set Date and time to Compile time if needed
     // rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
     Serial.println("RTC Init Done");
-    randomSeed(rtc.now().secondstime());
     rtcFound = true;
   }
   else  {
@@ -362,22 +375,21 @@ void setup() {
   nr.begin(800000U, MISO, MOSI, SCK, SS);
   delay(2000);
   Serial.println("Namino Rosso Init Done");
-
+  // Opening Modbus Interface
+  initMB();
 }
 
 void loop() {
   char        buf[80];
-  unsigned long theTime = millis();
+  uint32_t    theTime = millis();
   uint16_t    t_x = 0, t_y = 0; // To store the touch coordinates
   bool        pressed = false;
-  uint32_t    naLifeTime = nr.readLifeTime();
   sensors_event_t humidity, temp;
-  long        randNum = random(100);
 
 
 
   // limit loop period
-  if (abs( (long long) (theTime - lastLoop)) < LOOP_PERIOD)  {
+  if ((theTime - lastLoop) < LOOP_PERIOD)  {
     return;
   }
   lastLoop = theTime;
@@ -385,7 +397,7 @@ void loop() {
   nr.readAllRegister();
   naminoReady = nr.isReady();
 
-  // Analog Config
+  // Analog Config (only once at boot when Namino is Ready)
   if (configANIN && naminoReady) {
     // Configure analog Input (not used at the moment)  
     nr.writeRegister(WR_ANALOG_IN_CH01_CONF, ANALOG_IN_CH01_CONF_VALUES::CH01_PT1000);
@@ -396,39 +408,58 @@ void loop() {
     nr.writeRegister(WR_ANALOG_IN_CH08_CONF, ANALOG_IN_CH08_CONF_VALUES::CH08_DISABLED );
     nr.writeRegister(WR_ANALOG_OUT_CH01_CONF, ANALOG_OUT_CH01_CONF_VALUES::OUT_CH01_VOLTAGE);
     nr.writeAnalogOut(0.0); // output voltage
-    Serial.println("NR config completed");
-    Serial.printf("fwVersion: [0x%04x] boardType: [0x%04x] LifeTime: [%d]\n", nr.fwVersion(), nr.boardType(), naLifeTime);
+    delay(200);
+    secsFromBoot = 1;
+    Serial.println("NR Analog config completed");
+    Serial.printf("fwVersion: [0x%04x] boardType: [0x%04x] LifeTime: [%d]\n", nr.fwVersion(), nr.boardType(), secsFromBoot);
     configANIN = false;
+    setScreenBackLight(true);
+    return;
   }
+  // Namino Ready ?
+  if (not naminoReady)  {
+    Serial.println("NR NOT Ready");
+    return;
+  }
+  // Seconds from boot
+  secsFromBoot = nr.readLifeTime();
 
   // Touch Screen
   // Pressed will be set true is there is a valid touch on the screen
   pressed = myGLCD.getTouch(&t_x, &t_y);
   // Draw a white spot at the detected coordinates
   if (pressed) {
-    lastTouch = theTime;
     myGLCD.fillCircle(t_x, t_y, 2, TFT_WHITE);
     sprintf(buf, "Pressed @:X:%d - Y:%d", t_x, t_y);
     printText(0,230, buf);
+    Serial.println(buf);
+    // Switch back on BlackLight
+    setScreenBackLight(true);
+  }
+  else  {
+    // Switch off backlight
+    if (naminoReady && lastTouch > 0 && ( (secsFromBoot - lastTouch)  > TFT_SCREEN_SAVER_SECONDS) )   {
+      Serial.printf("Screen Saver Interval elapsed: %d\n", TFT_SCREEN_SAVER_SECONDS);
+      setScreenBackLight(false);
+    }
   }
 
-
   // Read RTC every second
-  if (rtcFound && (abs( (long long) (theTime - lastTime)) > TIME_PERIOD))  {
+  if (rtcFound && ( (theTime - lastRTCReadTime) > TIME_PERIOD))  {
     // Reading RTC
-    lastTime = theTime;
+    lastRTCReadTime = theTime;
     DateTime now = rtc.now();
     sprintf(buf, "%01d:%02d:%02d %02d/%02d/%02d", now.hour(), now.minute(), now.second(), now.day(), now.month(), now.year() - 2000);
     Serial.printf("Current Date and Time: [%s]\n", buf);
     printText(0, 0, buf);
     // Namino Status and lifetime
-    sprintf(buf, "Namino Ready:%d - LifeTime:%d Random Num: %d", naminoReady, naLifeTime, randNum);
+    sprintf(buf, "Namino Ready:%d - LifeTime:%d Scr On: %d LT:%d", naminoReady, secsFromBoot, screenON, lastTouch);
     printText(0,60, buf);
     Serial.println(buf);
   }
 
   // Fields Values
-  if (abs( (long long) (theTime - lastFieldRead))  > FIELD_READ_PERIOD)   {
+  if ((theTime - lastFieldRead) > FIELD_READ_PERIOD)   {
     if (sht41Present)  {
   // Read SHT 41
       sht4.getEvent(&humidity, &temp);      // populate temp and humidity objects with fresh data    
@@ -453,9 +484,43 @@ void loop() {
   }
 
   // Update Industrial Registers
-  if (naminoReady)  {
+  if (naminoReady && secsFromBoot)  {
     nr.writeAllRegister();
   }
 
 }
 
+void setScreenBackLight(bool setON)
+{
+  if (setON)  {
+    if (CONFIG_ENABLE_BL && TFT_BL >= 0)  {
+      digitalWrite(TFT_BL, HIGH);
+    }
+    lastTouch = secsFromBoot;
+  }
+  else  {
+    if (CONFIG_ENABLE_BL && TFT_BL >= 0)  {
+      digitalWrite(TFT_BL, LOW);
+    }
+    lastTouch = 0;
+  }
+  screenON = setON;
+  delay(100);
+  Serial.printf("Set Screen to: %s (BL: Enabled:%d  BL Pin:%d Last Touch Sec:%d)\n", setON ? "ON" : "OFF", CONFIG_ENABLE_BL, TFT_BL, lastTouch);
+}
+
+void initMB()
+{
+  Serial1.begin(NAMINO_MODBUS_BAUD, SERIAL_8N1, NAMINO_MODBUS_RX, NAMINO_MODBUS_TX);
+  Serial1.setRxBufferSize(2048);
+  Serial1.setTxBufferSize(2048);
+  Serial1.setRxFIFOFull(1);
+  mb.begin(&Serial1, NAMINO_MODBUS_RTS);
+  mb.slave(mbNodeID);
+
+  // modbus registers
+  mb.addHreg(RO_NAMINO_ID);
+  mb.addHreg(RO_LIFE_TIME_H);
+  mb.addHreg(RO_LIFE_TIME_L);
+
+}
