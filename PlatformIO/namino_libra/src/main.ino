@@ -66,6 +66,15 @@ bool          indicatorRed      = false;
 bool          configAN          = true;
 unsigned long msAN              = millis();
 char          buf[64];
+// lamp dual color blink
+typedef enum {
+  DISABLE   = 0,
+  RED       = 1,
+  GREEN     = 2,
+} LAMP_DUAL_BLINK;
+unsigned long lastBlinkTiming   = millis();
+unsigned long lastBlinkStart    = millis();
+LAMP_DUAL_BLINK ldt             = LAMP_DUAL_BLINK::DISABLE;
 
 namino_rosso nr = namino_rosso();
 
@@ -106,6 +115,7 @@ void setup() {
 
   autozeroCount = AUTOZERO_COUNT_MAX;
   weightLeftM = weightRightM = 0;
+  ldt = LAMP_DUAL_BLINK::DISABLE;
 }
 
 void displayBanner() {
@@ -202,30 +212,6 @@ void calibrateR() {
   }
 }
 
-// void weightMeasure() {
-//   if (nr.isReady() && autozeroCount == 0) {
-//       rawValueL = nr.loadRegister(RO_ANALOG_IN_CH01);
-//       rawValueR = nr.loadRegister(RO_ANALOG_IN_CH05);
-//       // weightLeft = nr.readLoadCell(1);
-//       // weightRight = nr.readLoadCell(2);
-
-//       if (rawValueL >= 32768) {
-//         Serial.println("L 1");
-//         weightLeft = rawValueL - 65536;
-//       } else {
-//         Serial.println("L 2");
-//         weightLeft = rawValueL;
-//       }
-//       if (rawValueR >= 32768) {
-//         Serial.println("R 1");
-//         weightRight = rawValueR - 65536;
-//       } else {
-//         Serial.println("R 2");
-//         weightRight = rawValueR;
-//       }
-//   }
-// }
-
 void displayMeasure() {
   if (nr.isReady() && autozeroCount == 0) {
     LCD_HOME(0);
@@ -234,11 +220,11 @@ void displayMeasure() {
 
     sprintf(buf, "MLT %f MRT %f", WEIGHT_NET_L, WEIGHT_NET_R);
     Serial.println(buf); // debug
-    sprintf(buf, "weightLeftM %f", weightLeftM);
+    sprintf(buf, "weightLeftM %f weightRightM %f", weightLeftM, weightRightM);
     Serial.println(buf); // debug
-    sprintf(buf, "weightLeftBias %f", weightLeftBias);
+    sprintf(buf, "weightLeftBias %f weightRightBias %f", weightLeftBias, weightRightBias);
     Serial.println(buf); // debug
-    sprintf(buf, "weightLeftRamp %f", weightLeftRamp);
+    sprintf(buf, "weightLeftRamp %f weightRightRamp %f", weightLeftRamp, weightRightRamp);
     Serial.println(buf); // debug
 
     LCD_HOME(1);
@@ -247,6 +233,7 @@ void displayMeasure() {
       sprintf(buf, " HAI VINTO VINTO! ");
       indicatorGreen = true;
       indicatorRed = false;
+      ldt = LAMP_DUAL_BLINK::DISABLE;
     } else if (WEIGHT_NET_L < WEIGHT_NET_R) {
       sprintf(buf, "%+5.0f g ------->", delta);
       indicatorGreen = false;
@@ -279,6 +266,24 @@ char decodeButton(int button_v) {
     return 'R';
   }
   return ' ';
+}
+
+void dualBlink() {
+  if (ldt == LAMP_DUAL_BLINK::DISABLE) return;
+
+  if (millis() - lastBlinkTiming > 250) {
+    lastBlinkTiming = millis();
+
+    if (ldt == LAMP_DUAL_BLINK::RED) {
+      ldt = LAMP_DUAL_BLINK::GREEN;
+      indicatorGreen = true;
+      indicatorRed = false;
+    } else if (ldt == LAMP_DUAL_BLINK::GREEN) {
+      ldt = LAMP_DUAL_BLINK::RED;
+      indicatorGreen = false;
+      indicatorRed = true;
+    }
+  }
 }
 
 void loop() {
@@ -322,6 +327,7 @@ void loop() {
     Serial.println("calibrate 312 g on right");
     calibrateR();
   }
+  dualBlink();
   nr.writeDigOut(1, indicatorGreen);
   nr.writeDigOut(2, indicatorRed);
 
@@ -341,10 +347,38 @@ void loop() {
   nr.writeAllRegister();
 
   // reset game
-  if (weightLeftM < 25 && weightRightM < 25) {
+  if (WEIGHT_NET_L < 25 && WEIGHT_NET_R < 25) {
     indicatorGreen = false;
     indicatorRed = true;
+    ldt = LAMP_DUAL_BLINK::DISABLE;
   }
+  if ((autozeroCount == 0) &&
+      (WEIGHT_NET_L < 25 && WEIGHT_NET_R >= 25) ||
+      (WEIGHT_NET_L >= 25 && WEIGHT_NET_R < 25)) { 
+    Serial.println("BLINK");
+  }
+  // lamp dual color blink
+  // // lamp dual color blink start
+  // if ((autozeroCount == 0) && 
+  //     (ldt == LAMP_DUAL_BLINK::DISABLE) && 
+  //     (WEIGHT_NET_L >= 50 || WEIGHT_NET_R >= 50)) {
+  //   lastBlinkStart = millis();
+  //   ldt = LAMP_DUAL_BLINK::RED;
+  //   Serial.println("2 ---");
+  // }
+  // // lamp dual color blink reset
+  // if ((autozeroCount == 0) && 
+  //     (ldt != LAMP_DUAL_BLINK::DISABLE) && 
+  //     (WEIGHT_NET_L < 25 && WEIGHT_NET_R < 25)) {
+  //   ldt = LAMP_DUAL_BLINK::DISABLE;
+  //   Serial.println("3 ---");
+  // }
+  // // lamp dual color blink timeout 
+  // if ((autozeroCount == 0) && 
+  //     (millis() - lastBlinkStart > (1000 * 5))) {
+  //   ldt = LAMP_DUAL_BLINK::DISABLE;
+  //   Serial.println("4 ---");
+  // }
 
   delay(250);  
 }
