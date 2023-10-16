@@ -443,10 +443,12 @@ void loop() {
     }
     if (naminoReady)  {
       externalTemperature = nr.readPt1000(1);
-      heaterTemperature = nr.readPt1000(3);
+      heaterTemperature = nr.readPt1000(2);
       sprintf(buf,"External Temperature: %.1f Heater Temperature: %.1f", externalTemperature, heaterTemperature);
       Serial.println(buf);
       printText(0, 135, buf);
+      // debug function
+      nr.showRegister();    
     }
   }
 
