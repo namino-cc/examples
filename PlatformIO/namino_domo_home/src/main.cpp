@@ -534,27 +534,27 @@ void loop() {
   Serial.print(buf);
 
   ry += 25;
-  sprintf(buf, "VOC  %5.0f     Tset %3.1f C", modbus_voc / 1.0, modbus_tset / 10.0); // R1005 --> to float
+  sprintf(buf, "VOC  %5.1f idx Tset %3.1f C", modbus_voc / 10.0, modbus_tset / 10.0); // R1005 --> to float
   printText(0, ry, buf, 2, 1);
   Serial.print(buf);
 
   ry += 25;
-  sprintf(buf, "PM1.0 %4.1f ppm", modbus_pm1_0 / 10.0); // R1006
+  sprintf(buf, "PM1.0 %4.1f ug/m3", modbus_pm1_0 / 10.0); // R1006
   printText(0, ry, buf, 2, 1);
   Serial.print(buf);
   
   ry += 25;
-  sprintf(buf, "PM2.5 %4.1f ppm", modbus_pm2_5 / 10.0); // R1007
+  sprintf(buf, "PM2.5 %4.1f ug/m3", modbus_pm2_5 / 10.0); // R1007
   printText(0, ry, buf, 2, 1);
   Serial.print(buf);
   
   ry += 25;
-  sprintf(buf, "PM4.0 %4.1f ppm", modbus_pm4_0 / 10.0); // R1008
+  sprintf(buf, "PM4.0 %4.1f ug/m3", modbus_pm4_0 / 10.0); // R1008
   printText(0, ry, buf, 2, 1);
   Serial.print(buf);
 
   ry += 25;
-  sprintf(buf, "PM10  %4.1f ppm", modbus_pm10 / 10.0); // R1009
+  sprintf(buf, "PM10  %4.1f ug/m3", modbus_pm10 / 10.0); // R1009
   printText(0, ry, buf, 2, 1);
   Serial.print(buf);
 
