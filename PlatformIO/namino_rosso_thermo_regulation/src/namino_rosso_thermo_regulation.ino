@@ -49,6 +49,17 @@ typedef enum {
 } SENSORS_MODBUS_REGISTERS;
 
 typedef enum {
+  TPAC_TEMP    = 1001,
+  TPAC_HUMI    = 1002,
+  TPAC_CO2     = 1003,
+  TPAC_VOC     = 1005,
+  TPAC_PM1_0   = 1006,
+  TPAC_PM2_5   = 1007,
+  TPAC_PM4_0   = 1008,
+  TPAC_PM10    = 1009,
+} TPAC_MODBUS_REGISTERS;
+
+typedef enum {
   TEMP_GET    = 1010,
   TEMP_SET    = 1011,
 } THERMOREGULATION_MODBUS_REGISTERS;
@@ -301,6 +312,27 @@ void loop() {
     mbWait();
     mb.writeHreg(MODBUS_DISPLAY_ID, THERMOREGULATION_MODBUS_REGISTERS::TEMP_SET, (uint16_t)(setPoint * 10.0));
     mbWait();
+    // write to modbus TPAC device id
+    mb.writeHreg(MODBUS_TPAC_ID, TPAC_MODBUS_REGISTERS::TPAC_TEMP, modbus_temp);
+    mbWait();
+    mb.writeHreg(MODBUS_TPAC_ID, TPAC_MODBUS_REGISTERS::TPAC_HUMI, modbus_humi);
+    mbWait();
+    mb.writeHreg(MODBUS_TPAC_ID, TPAC_MODBUS_REGISTERS::TPAC_CO2, modbus_co2);
+    mbWait();;
+    mb.writeHreg(MODBUS_TPAC_ID, TPAC_MODBUS_REGISTERS::TPAC_VOC, modbus_voc);
+    mbWait();
+    mb.writeHreg(MODBUS_TPAC_ID, TPAC_MODBUS_REGISTERS::TPAC_PM1_0, modbus_pm1_0);
+    mbWait();
+    mb.writeHreg(MODBUS_TPAC_ID, TPAC_MODBUS_REGISTERS::TPAC_PM2_5, modbus_pm2_5);
+    mbWait();
+    mb.writeHreg(MODBUS_TPAC_ID, TPAC_MODBUS_REGISTERS::TPAC_PM4_0, modbus_pm4_0);
+    mbWait();
+    mb.writeHreg(MODBUS_TPAC_ID, TPAC_MODBUS_REGISTERS::TPAC_PM10, modbus_pm10);
+    mbWait();
+    //mb.writeHreg(MODBUS_TPAC_ID, THERMOREGULATION_MODBUS_REGISTERS::TEMP_GET, (uint16_t)(tc * 10.0));
+    //mbWait();
+    //mb.writeHreg(MODBUS_TPAC_ID, THERMOREGULATION_MODBUS_REGISTERS::TEMP_SET, (uint16_t)(setPoint * 10.0));
+    //mbWait();    
     // only debug
     Serial.printf("WRITE temp: %d | humi: %d | co2: %d | voc: %d | pm1_0: %d | pm2_5: %d | pm4_0: %d | pm10: %d | Tget: %d | Tset: %d\n", 
                    modbus_temp, modbus_humi, modbus_co2, modbus_voc, modbus_pm1_0, modbus_pm2_5, modbus_pm4_0, modbus_pm10,
