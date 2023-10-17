@@ -327,6 +327,17 @@ void loop() {
     Serial.println("calibrate 312 g on right");
     calibrateR();
   }
+  // lamp dual color blink
+  if ((autozeroCount == 0) &&
+      (WEIGHT_NET_L < 25 && WEIGHT_NET_R >= 25) ||
+      (WEIGHT_NET_L >= 25 && WEIGHT_NET_R < 25)) { 
+    Serial.println("BLINK");
+    if (ldt == LAMP_DUAL_BLINK::DISABLE) {
+      ldt = LAMP_DUAL_BLINK::RED;
+    }
+  } else {
+    ldt = LAMP_DUAL_BLINK::DISABLE;
+  }
   dualBlink();
   nr.writeDigOut(1, indicatorGreen);
   nr.writeDigOut(2, indicatorRed);
@@ -352,33 +363,6 @@ void loop() {
     indicatorRed = true;
     ldt = LAMP_DUAL_BLINK::DISABLE;
   }
-  if ((autozeroCount == 0) &&
-      (WEIGHT_NET_L < 25 && WEIGHT_NET_R >= 25) ||
-      (WEIGHT_NET_L >= 25 && WEIGHT_NET_R < 25)) { 
-    Serial.println("BLINK");
-  }
-  // lamp dual color blink
-  // // lamp dual color blink start
-  // if ((autozeroCount == 0) && 
-  //     (ldt == LAMP_DUAL_BLINK::DISABLE) && 
-  //     (WEIGHT_NET_L >= 50 || WEIGHT_NET_R >= 50)) {
-  //   lastBlinkStart = millis();
-  //   ldt = LAMP_DUAL_BLINK::RED;
-  //   Serial.println("2 ---");
-  // }
-  // // lamp dual color blink reset
-  // if ((autozeroCount == 0) && 
-  //     (ldt != LAMP_DUAL_BLINK::DISABLE) && 
-  //     (WEIGHT_NET_L < 25 && WEIGHT_NET_R < 25)) {
-  //   ldt = LAMP_DUAL_BLINK::DISABLE;
-  //   Serial.println("3 ---");
-  // }
-  // // lamp dual color blink timeout 
-  // if ((autozeroCount == 0) && 
-  //     (millis() - lastBlinkStart > (1000 * 5))) {
-  //   ldt = LAMP_DUAL_BLINK::DISABLE;
-  //   Serial.println("4 ---");
-  // }
 
   delay(250);  
 }
