@@ -341,8 +341,10 @@ void setup() {
   Serial.println("Starting RTC");
   Wire.begin(NAMINO_I2C_SDA, NAMINO_I2C_SCL);
   if (rtc.begin())  {
-    // Uncomment to Set Date and time to Compile time if needed
-    // rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
+    // Adjust RTC Date and time to Compile time if needed
+    if (rtc.now().year() < 2023)  {
+      rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
+    }
     Serial.println("RTC Init Done");
     rtcFound = true;
   }
@@ -408,12 +410,13 @@ void loop() {
     nr.writeRegister(WR_ANALOG_IN_CH08_CONF, ANALOG_IN_CH08_CONF_VALUES::CH08_DISABLED );
     nr.writeRegister(WR_ANALOG_OUT_CH01_CONF, ANALOG_OUT_CH01_CONF_VALUES::OUT_CH01_VOLTAGE);
     nr.writeAnalogOut(0.0); // output voltage
+    nr.writeAllRegister();
     delay(200);
     secsFromBoot = 1;
     Serial.println("NR Analog config completed");
     Serial.printf("fwVersion: [0x%04x] boardType: [0x%04x] LifeTime: [%d]\n", nr.fwVersion(), nr.boardType(), secsFromBoot);
-    configANIN = false;
     setScreenBackLight(true);
+    configANIN = false;
     return;
   }
   // Namino Ready ?
@@ -429,18 +432,23 @@ void loop() {
   pressed = myGLCD.getTouch(&t_x, &t_y);
   // Draw a white spot at the detected coordinates
   if (pressed) {
-    myGLCD.fillCircle(t_x, t_y, 2, TFT_WHITE);
+    // myGLCD.fillCircle(t_x, t_y, 2, TFT_WHITE);
     sprintf(buf, "Pressed @:X:%d - Y:%d", t_x, t_y);
     printText(0,230, buf);
     Serial.println(buf);
     // Switch back on BlackLight
     setScreenBackLight(true);
+    // delay(200);
   }
   else  {
     // Switch off backlight
     if (naminoReady && lastTouch > 0 && ( (secsFromBoot - lastTouch)  > TFT_SCREEN_SAVER_SECONDS) )   {
       Serial.printf("Screen Saver Interval elapsed: %d\n", TFT_SCREEN_SAVER_SECONDS);
       setScreenBackLight(false);
+    }
+    // Clear last touch position
+    if (lastTouch > 0)  {
+      myGLCD.fillRect(0, 230, TFT_HEIGHT, TFT_WIDTH - 230, TFT_BLACK);
     }
   }
 
@@ -479,7 +487,7 @@ void loop() {
       Serial.println(buf);
       printText(0, 135, buf);
       // debug function
-      nr.showRegister();    
+      // nr.showRegister();    
     }
   }
 
