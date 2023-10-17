@@ -21,17 +21,22 @@ Preferences appPreferences;
 #define LOOP_PERIOD   500 // 500ms loop period
 #define CS_MICRO      10
 #define CS_SD_CARD    14
-#define TFT_BACKLIGHT 16
 #define CALIBRATION_DATA    "pointercal"
 #define CALIBRATION_POINTS  5
+
+#define TFT_SCREEN_SAVER_SECONDS 600         // Screen Saver ON in Seconds
+
 
 TFT_eSPI myGLCD = TFT_eSPI(); // Invoke custom library
 
 uint32_t      lastLoop = 0;
+uint32_t      lastTouch = 0;                       // Last Screen Touch in seconds from Boot
+uint32_t      secsFromBoot = 0;                    // Seconds from Namino Rosso 
 uint32_t      loopCounter = 0;
 uint32_t      myColor = TFT_BLACK;
 bool          sdCardPresent = false;
-
+bool          configANIN = true;
+bool          naminoReady = false;
 // Color Loop Flags
 uint8_t       myRed = 0;
 uint8_t       myGreen = 0;
@@ -39,6 +44,11 @@ uint8_t       myBlue = 0;
 bool          redDone = false;
 bool          greenDone = false;
 bool          blueDone = false;
+
+bool          screenON = false;
+
+
+void setScreenBackLight(bool setON);
 
 bool readTouchCalibration(uint16_t *calData)
 {
@@ -255,8 +265,12 @@ void setup() {
   Serial.println(TFT_DC);  
   Serial.print("TOUCH_CS: ");
   Serial.println(TOUCH_CS);
-  Serial.print("TFT_BACKLIGHT: ");
-  Serial.println(TFT_BACKLIGHT);
+  Serial.print("TFT_BACKLIGHT PIN: ");
+  Serial.println(TFT_BL);
+  Serial.print("CONFIG_ENABLE_BL: ");
+  Serial.println(CONFIG_ENABLE_BL);
+  Serial.print("TFT_SCREEN SAVER SEC: ");
+  Serial.println(TFT_SCREEN_SAVER_SECONDS);
   Serial.println("-------------------");
   Serial.flush();
   delay(2000);
@@ -266,12 +280,13 @@ void setup() {
   digitalWrite(CS_MICRO, HIGH);    
 
   // TFT Init
-  pinMode(TFT_BACKLIGHT, OUTPUT);
-  digitalWrite(TFT_BACKLIGHT, HIGH);
-
   Serial.println("Starting TFT Display");
   myGLCD.init();
   myGLCD.setRotation(1);
+  if (CONFIG_ENABLE_BL && TFT_BL >= 0)  {
+    pinMode(TFT_BL, OUTPUT);
+    digitalWrite(TFT_BL, HIGH);
+  }
   myGLCD.fillScreen(TFT_BLACK);       //  fill the screen with black color
   myGLCD.setTextColor(TFT_GREEN);     //  set the text color
   
@@ -331,7 +346,6 @@ void loop() {
   uint16_t    t_x = 0, t_y = 0; // To store the touch coordinates
   bool        pressed = false;
   bool        naminoReady = false;
-  uint32_t    naLifeTime = nr.readLifeTime();
 
 
   // limit loop period
@@ -342,6 +356,56 @@ void loop() {
   // Read Industrial Registers
   nr.readAllRegister();
   naminoReady = nr.isReady();
+
+  // Analog Config (only once at boot when Namino is Ready)
+  if (configANIN && naminoReady) {
+    // Configure analog Input (not used at the moment)  
+    nr.writeRegister(WR_ANALOG_IN_CH01_CONF, ANALOG_IN_CH01_CONF_VALUES::CH01_PT1000);
+    nr.writeRegister(WR_ANALOG_IN_CH03_CONF, ANALOG_IN_CH03_CONF_VALUES::CH03_PT1000);
+    nr.writeRegister(WR_ANALOG_IN_CH05_CONF, ANALOG_IN_CH05_CONF_VALUES::CH05_DISABLED );
+    nr.writeRegister(WR_ANALOG_IN_CH06_CONF, ANALOG_IN_CH06_CONF_VALUES::CH06_DISABLED );
+    nr.writeRegister(WR_ANALOG_IN_CH07_CONF, ANALOG_IN_CH07_CONF_VALUES::CH07_DISABLED );
+    nr.writeRegister(WR_ANALOG_IN_CH08_CONF, ANALOG_IN_CH08_CONF_VALUES::CH08_DISABLED );
+    nr.writeRegister(WR_ANALOG_OUT_CH01_CONF, ANALOG_OUT_CH01_CONF_VALUES::OUT_CH01_VOLTAGE);
+    nr.writeAnalogOut(0.0); // output voltage
+    nr.writeAllRegister();
+    delay(200);
+    secsFromBoot = 1;
+    Serial.println("NR Analog config completed");
+    Serial.printf("fwVersion: [0x%04x] boardType: [0x%04x] LifeTime: [%d]\n", nr.fwVersion(), nr.boardType(), secsFromBoot);
+    setScreenBackLight(true);
+    configANIN = false;
+    return;
+  }
+  // Namino Ready ?
+  if (not naminoReady)  {
+    Serial.println("NR NOT Ready");
+    return;
+  }
+  // Seconds from boot
+  secsFromBoot = nr.readLifeTime();
+
+  // Touch Screen
+  // Pressed will be set true is there is a valid touch on the screen
+  pressed = myGLCD.getTouch(&t_x, &t_y);
+  // Draw a white spot at the detected coordinates
+  if (pressed) {
+    myGLCD.fillCircle(t_x, t_y, 2, TFT_WHITE);
+    sprintf(buf, "Pressed @:X:%d - Y:%d", t_x, t_y);
+    printText(0,120, buf);
+    Serial.println(buf);
+    // Switch back on BlackLight
+    setScreenBackLight(true);
+    // delay(200);
+  }
+  else  {
+    // Switch off backlight
+    if (naminoReady && lastTouch > 0 && ( (secsFromBoot - lastTouch)  > TFT_SCREEN_SAVER_SECONDS) )   {
+      Serial.printf("Screen Saver Interval elapsed: %d\n", TFT_SCREEN_SAVER_SECONDS);
+      setScreenBackLight(false);
+    }
+  }
+
   // Loop on Color components
   // Reset color Components
   if (blueDone && myBlue == 255)  {
@@ -405,8 +469,26 @@ void loop() {
   printText(0,0, buf);
   Serial.print(buf);
   // Namino Status and lifetime
-  sprintf(buf, "Namino Ready:%d - LifeTime:%d", naminoReady, naLifeTime);
+  sprintf(buf, "NR:%d - LifeTime:%d Last Touch:%d Remaing:%d", naminoReady, secsFromBoot, lastTouch, TFT_SCREEN_SAVER_SECONDS - (secsFromBoot - lastTouch));
   printText(0,60, buf);
   Serial.println(buf);
 }
 
+void setScreenBackLight(bool setON)
+{
+  if (setON)  {
+    if (CONFIG_ENABLE_BL && TFT_BL >= 0)  {
+      digitalWrite(TFT_BL, HIGH);
+    }
+    lastTouch = secsFromBoot;
+  }
+  else  {
+    if (CONFIG_ENABLE_BL && TFT_BL >= 0)  {
+      digitalWrite(TFT_BL, LOW);
+    }
+    lastTouch = 0;
+  }
+  screenON = setON;
+  delay(100);
+  Serial.printf("Set Screen to: %s (BL: Enabled:%d  BL Pin:%d Last Touch Sec:%d)\n", setON ? "ON" : "OFF", CONFIG_ENABLE_BL, TFT_BL, lastTouch);
+}
