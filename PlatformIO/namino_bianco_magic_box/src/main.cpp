@@ -5,17 +5,17 @@
 #include "namino_bianco_pins.h"			// Namino Bianco Pins definitions
 #include "main.h"
 
-#include <Wire.h>
 #include <MFRC522.h>
 
 // RC522 Reader Instance
 MFRC522 mfrc522(CS_PIN, RST_PIN);   // Create MFRC522 instance.
 MFRC522::MIFARE_Key key;
-int             tagReaderErrors = 0;
+int           tagReaderErrors = 0;
 
 // Time counters (in millis)
 uint32_t      lastTagdRead = 0;
 uint32_t      lastLoop = 0;
+uint32_t      loopCounter = 0;
 uint32_t      lastDoorOpened = 0;
 uint32_t      startBlinkTime = 0;
 uint32_t      startResultTime = 0;
@@ -97,8 +97,12 @@ void setup() {
   // Close Keylock
   digitalWrite(KEYLOCK_OUT, LOW);
 
+
+
   // Starting SPI
-  // SPI Setup (Exposed SPI Pin of Namino boards)
+  pinMode(CS_PIN, OUTPUT);
+  digitalWrite(CS_PIN, HIGH);    
+  // SPI Setup (Exposed SPI Pin on Mikroe Bus)
   SPI.begin(SCK, MISO, MOSI, CS_PIN);
 
   // MFRC522 Setup
@@ -123,9 +127,11 @@ void setup() {
 
   randomSeed(millis());
   // Feedbak to User
-  digitalWrite(GREEN_PIN, LOW);    
-  digitalWrite(RED_PIN, LOW);    
-  digitalWrite(YELLOW_PIN, LOW);    
+  if (readerOk)  {
+    digitalWrite(GREEN_PIN, LOW);    
+    digitalWrite(RED_PIN, LOW);    
+    digitalWrite(YELLOW_PIN, LOW);    
+  }
 }
 
 void loop() {
@@ -141,6 +147,13 @@ void loop() {
     return;
   }
   lastLoop = theTime;
+
+  // Check RFID Reader   
+  if (not readerOk)  {
+    tagReaderErrors++;
+    Serial.printf("Tag Reader is OFFLINE. Errors:[%d]\n", tagReaderErrors);    
+    return;
+  }
 
   // Reading Keylock Status and setting Keylock Light
   keyLocked = digitalRead(KEYLOCK_IN);
@@ -168,7 +181,9 @@ void loop() {
         startBlinkTime = 0;
       }
       else  {
-        blinkOn = setBlink(blinkOn);
+        if ((loopCounter % 2) == 0)  {
+          blinkOn = setBlink(blinkOn);
+        }
       }
   }
 
@@ -182,14 +197,7 @@ void loop() {
       startResultTime = 0;
     }
   }
-
-  // Check RFID Reader
-  if (not readerOk)  {
-    tagReaderErrors++;
-    Serial.printf("Tag Reader is OFFLINE. Errors:[%d]\n", tagReaderErrors);    
-    return;
-  }
-
+  
   // Check RFID Presence only if ended result time
   // Uncomment Keylocked = true when 12V is not connected
   // keyLocked = true;
@@ -262,6 +270,7 @@ void loop() {
   }
   // Loop End, show Keylock status
   Serial.printf("[%s]", keyLocked ? "L" : "U");
+  loopCounter++;
 }
 
 void tagOK()
@@ -273,6 +282,7 @@ void tagOK()
   startResultTime = lastDoorOpened;
   digitalWrite(GREEN_PIN, HIGH);
   digitalWrite(GREEN_LIGHT, LOW);
+  setBlink(true);
 }
 
 void tagFailed()
@@ -303,7 +313,7 @@ bool setBlink(bool blinkON)
 	  digitalWrite(YELLOW_PIN, LOW);    
 	  digitalWrite(YELLOW_LIGHT, HIGH);    
   }
-  // Serial.printf("Set Led Blink: [%d]\n", blinkON);
+  Serial.printf("Set Led Blink: [%d]\n", blinkON);
   return not blinkON;
 }
 

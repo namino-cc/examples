@@ -2,7 +2,7 @@
 #define MAIN_H
 
 // RC-522 SPI PINS
-#define CS_PIN      SS          // Chip Select  on Shared SPI Bus (RFID Reader)
+#define CS_PIN      48          // Chip Select  on Shared SPI Bus (RFID Reader)
 #define RST_PIN     18          // Reset pin for RFID Reader
 
 // Arduino Pins for LED Traffic light module
@@ -14,13 +14,13 @@
 #define GREEN_LIGHT  42
 #define YELLOW_LIGHT 21
 #define RED_LIGHT    16
-#define WHITE_LIGHT  14
+#define WHITE_LIGHT  41
 
 // Keylock Output on Magic Box (via Active HIGH relay)
-#define KEYLOCK_OUT  41
+#define KEYLOCK_OUT  14
 
 // Keylock Input on Magic Box
-#define KEYLOCK_IN   47
+#define KEYLOCK_IN   06
 
 // Loop interval & Timing constants
 #define LOOP_PERIOD        250          // General loop period
