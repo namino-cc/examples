@@ -1,7 +1,7 @@
 #include "main.h"
 
-unsigned long lastTagdRead = 0;
-unsigned long lastLoop = 0;
+uint32_t      lastTagdRead = 0;
+uint32_t      lastLoop = 0;
 bool          readerOk = false;
 
 // LCD 20x4
@@ -69,11 +69,11 @@ void setup() {
 }
 
 void loop() {
-  unsigned long theTime = millis();
-  char line[LINE_LEN + 1];
+  uint32_t    theTime = millis();
+  char        line[LINE_LEN + 1];
 
   // limit loop period
-  if (abs( (long long) (theTime - lastLoop)) < LOOP_PERIOD)  {
+  if ((theTime - lastLoop) < LOOP_PERIOD)  {
     return;
   }
   lastLoop = theTime;

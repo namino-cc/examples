@@ -27,8 +27,8 @@ Preferences appPreferences;
 
 TFT_eSPI myGLCD = TFT_eSPI(); // Invoke custom library
 
-unsigned long lastLoop = 0;
-unsigned long loopCounter = 0;
+uint32_t      lastLoop = 0;
+uint32_t      loopCounter = 0;
 uint32_t      myColor = TFT_BLACK;
 bool          sdCardPresent = false;
 
@@ -327,15 +327,15 @@ void setup() {
 
 void loop() {
   char buf[80];
-  unsigned long theTime = millis();
-  uint16_t t_x = 0, t_y = 0; // To store the touch coordinates
-  bool pressed = false;
-  bool naminoReady = false;
-  uint32_t naLifeTime = nr.readLifeTime();
+  uint32_t    theTime = millis();
+  uint16_t    t_x = 0, t_y = 0; // To store the touch coordinates
+  bool        pressed = false;
+  bool        naminoReady = false;
+  uint32_t    naLifeTime = nr.readLifeTime();
 
 
   // limit loop period
-  if (abs( (long long) (theTime - lastLoop)) < LOOP_PERIOD)  {
+  if ((theTime - lastLoop) < LOOP_PERIOD)  {
     return;
   }
   lastLoop = theTime;

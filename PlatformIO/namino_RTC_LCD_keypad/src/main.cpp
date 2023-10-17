@@ -30,10 +30,10 @@ const int btnSELECT = 4;
 const int btnNONE = 5;
 
 // Key-Loop Counters
-unsigned long lastKeyTouch = 0;
-unsigned long lastFieldRead = 0;
-unsigned long lastLoop = 0;
-unsigned long lastTime = 0;
+uint32_t      lastKeyTouch = 0;
+uint32_t      lastFieldRead = 0;
+uint32_t      lastLoop = 0;
+uint32_t      lastTime = 0;
 
 
 //Allocate the LCD variable, with defined Pins
@@ -85,10 +85,10 @@ void setup() {
 
 void loop() {
   // put your main code here, to run repeatedly:
-  unsigned long theTime = millis();
+  uint32_t      theTime = millis();
 
   // limit loop period
-  if (abs( (long long) (theTime - lastLoop)) < LOOP_PERIOD)  {
+  if ((theTime - lastLoop) < LOOP_PERIOD)  {
     return;
   }
   lastLoop = theTime;

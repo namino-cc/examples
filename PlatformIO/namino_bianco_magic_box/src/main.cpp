@@ -1,14 +1,12 @@
-#include <Wire.h>
-#include <MFRC522.h>
 
 #ifdef NAMINO_BIANCO_BOARD
 #undef NAMINO_BIANCO_BOARD
 #endif
-
-#include "pins_arduino.h"			// Namino Bianco Pins definitions
-
+#include "namino_bianco_pins.h"			// Namino Bianco Pins definitions
 #include "main.h"
 
+#include <Wire.h>
+#include <MFRC522.h>
 
 // RC522 Reader Instance
 MFRC522 mfrc522(CS_PIN, RST_PIN);   // Create MFRC522 instance.
@@ -16,11 +14,11 @@ MFRC522::MIFARE_Key key;
 int             tagReaderErrors = 0;
 
 // Time counters (in millis)
-unsigned long lastTagdRead = 0;
-unsigned long lastLoop = 0;
-unsigned long lastDoorOpened = 0;
-unsigned long startBlinkTime = 0;
-unsigned long startResultTime = 0;
+uint32_t      lastTagdRead = 0;
+uint32_t      lastLoop = 0;
+uint32_t      lastDoorOpened = 0;
+uint32_t      startBlinkTime = 0;
+uint32_t      startResultTime = 0;
 
 // Status Flags
 bool          readerOk = false;
@@ -131,7 +129,7 @@ void setup() {
 }
 
 void loop() {
-  unsigned long theTime = millis();
+  uint32_t    theTime = millis();
   uint64_t    tagIDLow = 0;
   uint64_t    tagIDHigh = 0;
   byte        tagID[TAG_LEN];
@@ -139,7 +137,7 @@ void loop() {
 
 
   // limit loop period
-  if (abs( (long long) (theTime - lastLoop)) < LOOP_PERIOD)  {
+  if ((theTime - lastLoop) < LOOP_PERIOD)  {
     return;
   }
   lastLoop = theTime;
