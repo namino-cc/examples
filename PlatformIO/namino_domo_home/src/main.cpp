@@ -19,7 +19,7 @@ namino_rosso nr = namino_rosso();
 
 Preferences appPreferences;
 
-#define LOOP_PERIOD   3000 // loop period
+#define LOOP_PERIOD   500 // loop period
 #define CS_MICRO      10
 #define CS_SD_CARD    14
 #define TFT_BACKLIGHT 16
@@ -29,7 +29,10 @@ Preferences appPreferences;
 #define LED_BAR_1     1
 #define LED_BAR_2     2
 // distance sense
+#define DISTANCE_PERIOD_MS    (1000 * 12)
 double *distances;
+unsigned long distancesTiming = millis();
+
 
 TFT_eSPI myGLCD = TFT_eSPI(); // Invoke custom library
 
@@ -269,28 +272,36 @@ void sense() {
 
   if (distances[0] < 0) {
     Serial.println("zona 0");
-    nr.writeDigOut(LED_BAR_1, false);
-    nr.writeDigOut(LED_BAR_2, false);
-  } else if (distances[0] < 50) {
-    Serial.println("zona 50  --");
-    nr.writeDigOut(LED_BAR_1, true);
-    nr.writeDigOut(LED_BAR_2, true);
-  } else if (distances[0] < 100) {
-    Serial.println("zona 100 ----------");
-    nr.writeDigOut(LED_BAR_1, true);
-    nr.writeDigOut(LED_BAR_2, false);
+    if ((millis() - distancesTiming) > DISTANCE_PERIOD_MS) {
+      nr.writeDigOut(LED_BAR_1, false);
+      nr.writeDigOut(LED_BAR_2, false);
+    }
   } else if (distances[0] < 150) {
-    Serial.println("zona 150 ---------------");
+    Serial.println("zona --");
+    nr.writeDigOut(LED_BAR_1, true);
+    nr.writeDigOut(LED_BAR_2, true);
+    distancesTiming = millis();
+  } else if (distances[0] < 180) {
+    Serial.println("zona ----------");
+    nr.writeDigOut(LED_BAR_1, true);
+    nr.writeDigOut(LED_BAR_2, false);
+    distancesTiming = millis();
+  } else if (distances[0] < 190) {
+    Serial.println("zona ---------------");
     nr.writeDigOut(LED_BAR_1, false);
     nr.writeDigOut(LED_BAR_2, true);
+    distancesTiming = millis();
   } else if (distances[0] < 200) {
     Serial.println("zona 200 --------------------");
     nr.writeDigOut(LED_BAR_1, true);
     nr.writeDigOut(LED_BAR_2, false);
+    distancesTiming = millis();
   } else {
     Serial.println("zona > 200 -------------------------");
-    nr.writeDigOut(LED_BAR_1, false);
-    nr.writeDigOut(LED_BAR_2, false);
+    if ((millis() - distancesTiming) > DISTANCE_PERIOD_MS) {
+      nr.writeDigOut(LED_BAR_1, false);
+      nr.writeDigOut(LED_BAR_2, false);
+    }
   }
 }
 
@@ -449,7 +460,7 @@ void loop() {
 
   mb.task();
   yield();
-  delay(300);
+  delay(100);
 
   // limit loop period
   if (abs( (long long) (theTime - lastLoop)) < LOOP_PERIOD)  {
@@ -459,6 +470,11 @@ void loop() {
   // Read Industrial Registers
   nr.readAllRegister();
   naminoReady = nr.isReady();
+
+  // distance meter
+  if (naminoReady) {
+    sense();
+  }
   // Loop on Color components
   // Reset color Components
   // if (blueDone && myBlue == 255)  {
@@ -568,11 +584,6 @@ void loop() {
   // sprintf(buf, "Namino Ready:%d - LifeTime:%d", naminoReady, naLifeTime);
   // printText(0,60, buf);
   // Serial.println(buf);
-
-  // distance meter
-  if (naminoReady) {
-    sense();
-  }
 
   // only debug
   // if (naminoReady) {
