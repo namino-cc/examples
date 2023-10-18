@@ -210,7 +210,7 @@ void loop() {
   uint16_t cpot = analogRead(ADC1_CH3);         // PIN 4 on board mark
   float vpot = cpot * (3.3 / 4096.0);
   float tpot = mapf(cpot, 0, 4096, 20, 60);
-  setPoint = tpot;
+  setPoint = round(tpot);
   float_t tc = 0;
 
   uint16_t modbus_temp  = 11;
