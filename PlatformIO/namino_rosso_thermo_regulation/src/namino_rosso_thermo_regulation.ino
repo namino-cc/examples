@@ -240,9 +240,18 @@ void loop() {
     tc = nr.readPt1000(1);
     // Serial.printf("readPt1000(1) %f RO_ANALOG_IN_CH01 %d setPoint %f\n", tc, nr.loadRegister(RO_ANALOG_IN_CH01), setPoint);
     // Serial.printf("vpot: %3.6f V | T set: %3.6f C | T get: %3.6f C\n", vpot, setPoint, tc);
-    if (tc < setPoint) {
+    //
+    // zero hysteresis code
+    // if (tc < setPoint) {
+    //   nr.writeRele(true);  // Relay status setting.
+    // } else {
+    //   nr.writeRele(false); // Relay status setting.
+    // }
+    // hysteresis code
+    if (tc <= (setPoint - 1.0)) {
       nr.writeRele(true);  // Relay status setting.
-    } else {
+    } 
+    if (tc >= (setPoint + 1.0)) {
       nr.writeRele(false); // Relay status setting.
     }
   }
