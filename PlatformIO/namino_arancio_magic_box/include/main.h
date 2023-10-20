@@ -32,7 +32,7 @@
 #define TAG_LEN             16          // Maximum Tag Len
 #define ITEM_LEN            32          // Item Display string len
 #define TAG_ITEMS           20          // Number of Tags handled
-#define WINNERS_TAG         10          // Number of Winners Tags
+#define WINNERS_TAG          6          // Number of Winners Tags
 
 // Function Protos
 void selectWinners();
