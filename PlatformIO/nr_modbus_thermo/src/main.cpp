@@ -69,6 +69,19 @@ bool readTouchCalibration(uint16_t *calData)
   return nonZero;
 }
 
+bool clearTouchCalibration(uint16_t *calData)
+{
+  bool cleared = false;
+
+  for (uint8_t nPoint = 0; nPoint < CALIBRATION_POINTS; nPoint++)  {
+    calData[nPoint] = 0;
+  }
+  appPreferences.begin(CALIBRATION_DATA, true);
+  cleared = appPreferences.clear();
+  appPreferences.end();
+  return cleared;
+}
+
 bool writeTouchCalibration(uint16_t *calData)
 {
   char        ptKey[5];
@@ -241,6 +254,7 @@ void touch_calibrate()
 void setup() {
 
   uint16_t    calibrationData[CALIBRATION_POINTS] = {0,0,0,0,0};   // Screen Calibration Data
+  bool        resetCalData = false;
 
   // Serial Setup
   Serial.begin(115200);
@@ -278,8 +292,19 @@ void setup() {
   Serial.println(NAMINO_MODBUS_BAUD);
   Serial.print("Modbus RTU Node ID: ");
   Serial.println(mbNodeID);
-
   Serial.println("-------------------");
+  // Clear Calibration if required
+#ifdef CLEAR_CALIBRATION
+  if (CLEAR_CALIBRATION == 1)  {
+    resetCalData = true;
+    if (clearTouchCalibration(calibrationData))  {
+      Serial.print("Cleared Calibration Data");      
+    }
+    else  {
+      Serial.print("Error Clearing Calibration Data");      
+    }
+  }
+#endif
   Serial.flush();
   delay(2000);
 
@@ -297,7 +322,7 @@ void setup() {
   
   // Calibrate the touch screen and retrieve the scaling factors
   Serial.println("Retrieving Calibration Data");
-  if (readTouchCalibration(calibrationData))  {
+  if (not resetCalData && readTouchCalibration(calibrationData))  {
     myGLCD.setTouch(calibrationData);
     Serial.println("TFT Calibration Data applied");
   }
