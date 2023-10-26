@@ -3,7 +3,9 @@ Makefile
 hmi
 *.qm
 moc_*
+qrc_*
 ui_*
 *.obj
 *.o
 *.bak
+
