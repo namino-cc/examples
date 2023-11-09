@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2023 Namino Team, : 1.0.1 @ 2023-10-25
+// Copyright (c) 2023 Namino Team, bianco version: 1.0.0 @ 2023-10-04
 //
 //
 #ifndef Pins_Arduino_h
@@ -63,7 +63,6 @@ static const uint8_t MOSI            = GPIO11;
 static const uint8_t MISO            = GPIO13;
 static const uint8_t SCK             = GPIO12;
 
-#define LED_BUILTIN              GPIO47
 /* End Pins on ESP32-S3-WROOM-1U-N4R8 */
 
 /* Begin Analog Pins on ESP32-S3-WROOM-1U-N4R8 */
