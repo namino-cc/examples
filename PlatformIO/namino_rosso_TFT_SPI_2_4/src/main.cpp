@@ -24,7 +24,7 @@ Preferences appPreferences;
 #define CALIBRATION_DATA    "pointercal"
 #define CALIBRATION_POINTS  5
 
-#define TFT_SCREEN_SAVER_SECONDS 600         // Screen Saver ON in Seconds
+#define TFT_SCREEN_SAVER_SECONDS 0                 // Screen Saver ON in Seconds (0=Disable Screen Saver)
 
 
 TFT_eSPI myGLCD = TFT_eSPI(); // Invoke custom library
@@ -385,27 +385,6 @@ void loop() {
   // Seconds from boot
   secsFromBoot = nr.readLifeTime();
 
-  // Touch Screen
-  // Pressed will be set true is there is a valid touch on the screen
-  pressed = myGLCD.getTouch(&t_x, &t_y);
-  // Draw a white spot at the detected coordinates
-  if (pressed) {
-    myGLCD.fillCircle(t_x, t_y, 2, TFT_WHITE);
-    sprintf(buf, "Pressed @:X:%d - Y:%d", t_x, t_y);
-    printText(0,120, buf);
-    Serial.println(buf);
-    // Switch back on BlackLight
-    setScreenBackLight(true);
-    // delay(200);
-  }
-  else  {
-    // Switch off backlight
-    if (naminoReady && lastTouch > 0 && ( (secsFromBoot - lastTouch)  > TFT_SCREEN_SAVER_SECONDS) )   {
-      Serial.printf("Screen Saver Interval elapsed: %d\n", TFT_SCREEN_SAVER_SECONDS);
-      setScreenBackLight(false);
-    }
-  }
-
   // Loop on Color components
   // Reset color Components
   if (blueDone && myBlue == 255)  {
@@ -453,23 +432,38 @@ void loop() {
   uint16_t  backColor = myGLCD.color565(myRed, myGreen, myBlue);
   // myColor = myGLCD.color16to24(backColor);
   myGLCD.fillScreen(backColor);       // Repaint
-  // Pressed will be set true is there is a valid touch on the screen
-  pressed = myGLCD.getTouch(&t_x, &t_y);
   // Text Color
   uint16_t  textColor = myGreen < 128 ? TFT_GREEN : TFT_BLUE;
   myGLCD.setTextColor(textColor);
+
+  // Touch Screen
+  // Pressed will be set true is there is a valid touch on the screen
+  pressed = myGLCD.getTouch(&t_x, &t_y);
   // Draw a white spot at the detected coordinates
   if (pressed) {
+    // Switch back on BlackLight
+    setScreenBackLight(true);
+  // Draw a white spot at the detected coordinates
     myGLCD.fillCircle(t_x, t_y, 2, TFT_WHITE);
     sprintf(buf, "Pressed @:X:%d - Y:%d", t_x, t_y);
     printText(0,120, buf);
+    lastTouch = secsFromBoot;
+    delay(200);
   }
+  else  {
+    // Switch off backlight  
+    if (TFT_SCREEN_SAVER_SECONDS && naminoReady && lastTouch > 0 && ( (secsFromBoot - lastTouch)  > TFT_SCREEN_SAVER_SECONDS) )   {
+      Serial.printf("Screen Saver Interval elapsed: %d\n", TFT_SCREEN_SAVER_SECONDS);
+      setScreenBackLight(false);
+    }
+  }
+
   // Display data
   sprintf(buf, "LC: %6d BG Color: %08X R:%d G:%d B:%d ", ++loopCounter, backColor, myRed, myGreen, myBlue);
   printText(0,0, buf);
   Serial.print(buf);
   // Namino Status and lifetime
-  sprintf(buf, "NR:%d - LifeTime:%d Last Touch:%d Remaing:%d", naminoReady, secsFromBoot, lastTouch, TFT_SCREEN_SAVER_SECONDS - (secsFromBoot - lastTouch));
+  sprintf(buf, "NR:%d - T:%d NR LT:%d Last T.:%d Elaps.:%d", naminoReady, (theTime / 1000), secsFromBoot, lastTouch, (secsFromBoot - lastTouch));
   printText(0,60, buf);
   Serial.println(buf);
 }
@@ -480,7 +474,6 @@ void setScreenBackLight(bool setON)
     if (CONFIG_ENABLE_BL && TFT_BL >= 0)  {
       digitalWrite(TFT_BL, HIGH);
     }
-    lastTouch = secsFromBoot;
   }
   else  {
     if (CONFIG_ENABLE_BL && TFT_BL >= 0)  {
