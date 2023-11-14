@@ -55,6 +55,7 @@ bool            rtcFound = false;
 #define FIELD_READ_PERIOD     4000            // 4s interval of field read
 
 uint32_t      lastLoop = 0;
+uint32_t      loopCounter = 0;
 uint32_t      secsFromBoot = 0;               // Seconds from Namino Rosso configuration
 uint32_t      lastRTCReadTime = 0;            // Last RTC Read in millis()
 uint32_t      lastFieldRead = 0;              // Last field Read in millis()
@@ -112,6 +113,7 @@ char        buf[80];
     return;
   }
   lastLoop = theTime;
+  loopCounter++;
   // Read Industrial Registers
   nr.readAllRegister();
   naminoReady = nr.isReady();
@@ -165,7 +167,7 @@ char        buf[80];
   }
   // Read Led Status
   ledIsOn = nr.readDigOut(LED_BUILTIN);
-  Serial.printf("NR Lifetime: [%d] Led Status:[%s]\n", secsFromBoot, ledIsOn ? "ON" : "OFF");
+  Serial.printf("Loop: [%d] NR Lifetime: [%d] Led Status:[%s]\n", loopCounter, secsFromBoot, ledIsOn ? "ON" : "OFF");
 
   // Reverse Led Status
   nr.writeDigOut(LED_BUILTIN, not ledIsOn);
