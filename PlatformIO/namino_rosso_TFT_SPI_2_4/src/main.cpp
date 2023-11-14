@@ -271,6 +271,8 @@ void setup() {
   Serial.println(CONFIG_ENABLE_BL);
   Serial.print("TFT_SCREEN SAVER SEC: ");
   Serial.println(TFT_SCREEN_SAVER_SECONDS);
+  Serial.print("CS SD Card: ");
+  Serial.println(CS_SD_CARD);
   Serial.println("-------------------");
   Serial.flush();
   delay(2000);
