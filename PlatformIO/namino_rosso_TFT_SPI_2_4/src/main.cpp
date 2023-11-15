@@ -14,30 +14,34 @@
 
 #include <TFT_eSPI.h>      // Hardware-specific library
 
+// Namino Board
+#define CS_MICRO      10
 namino_rosso nr = namino_rosso();
+bool          configANIN = true;
+bool          naminoReady = false;
 
+// Preferences
 Preferences appPreferences;
 
-#define LOOP_PERIOD   500 // 500ms loop period
-#define CS_MICRO      10
-#define CS_SD_CARD    14
+// Touch Screen
 #define CALIBRATION_DATA    "pointercal"
 #define CALIBRATION_POINTS  5
-
-#define TFT_SCREEN_SAVER_SECONDS 0                 // Screen Saver ON in Seconds (0=Disable Screen Saver)
-
-
+#define TFT_SCREEN_SAVER_SECONDS 600              // Screen Saver ON in Seconds (0=Disable Screen Saver)
+#define TOUCH_IRQ 40                              // TOUCH IRQ (Not used in Library but connected)
 TFT_eSPI myGLCD = TFT_eSPI(); // Invoke custom library
 
+// SD Card
+#define CS_SD_CARD    21
+bool          sdCardPresent = false;
+
+// Timers
+#define LOOP_PERIOD   500 // 500ms loop period
 uint32_t      lastLoop = 0;
 uint32_t      lastTouch = 0;                       // Last Screen Touch in seconds from Boot
 uint32_t      secsFromBoot = 0;                    // Seconds from Namino Rosso 
 uint32_t      loopCounter = 0;
-uint32_t      myColor = TFT_BLACK;
-bool          sdCardPresent = false;
-bool          configANIN = true;
-bool          naminoReady = false;
 // Color Loop Flags
+uint32_t      myColor = TFT_BLACK;
 uint8_t       myRed = 0;
 uint8_t       myGreen = 0;
 uint8_t       myBlue = 0;
@@ -48,8 +52,15 @@ bool          blueDone = false;
 bool          screenON = false;
 
 
+// Functions Protos
 void setScreenBackLight(bool setON);
+bool readTouchCalibration(uint16_t *calData);
+bool clearTouchCalibration(uint16_t *calData);
+bool writeTouchCalibration(uint16_t *calData);
+void printText(int , int , String , uint8_t, uint8_t , uint8_t);
+void touch_calibrate();
 
+// Calibration
 bool readTouchCalibration(uint16_t *calData)
 {
   char      ptKey[5];
@@ -68,6 +79,21 @@ bool readTouchCalibration(uint16_t *calData)
   }
   appPreferences.end();
   return nonZero;
+}
+
+bool clearTouchCalibration(uint16_t *calData)
+{
+  bool cleared = false;
+  // Clear Calibration Data
+  for (uint8_t nPoint = 0; nPoint < CALIBRATION_POINTS; nPoint++)  {
+    calData[nPoint] = 0;
+  }
+  // Reset Calibration nameSpace
+  appPreferences.begin(CALIBRATION_DATA, false);
+  cleared = appPreferences.clear();
+  appPreferences.end();
+  // Write all Zeros to nameSpace
+  return writeTouchCalibration(calData);
 }
 
 bool writeTouchCalibration(uint16_t *calData)
@@ -248,9 +274,8 @@ void setup() {
   delay(3000);
   Serial.println("");
   Serial.println("=====================================");
-  Serial.println("##       ESP32 SPI TFT EXAMPLE     ##");
+  Serial.println("##  NAMINO ROSSO SPI TFT EXAMPLE   ##");
   Serial.println("=====================================");
-  Serial.println();
   Serial.print("TFT SPI MOSI: ");
   Serial.println(TFT_MOSI);
   Serial.print("TFT SPI MISO: ");
@@ -271,15 +296,33 @@ void setup() {
   Serial.println(CONFIG_ENABLE_BL);
   Serial.print("TFT_SCREEN SAVER SEC: ");
   Serial.println(TFT_SCREEN_SAVER_SECONDS);
+  Serial.print("TFT_TOUCH IRQ: ");
+  Serial.println(TOUCH_IRQ);
   Serial.print("CS SD Card: ");
   Serial.println(CS_SD_CARD);
   Serial.println("-------------------");
   Serial.flush();
   delay(2000);
 
+  // Clear Calibration if required
+#if defined(CLEAR_CALIBRATION)
+  if (CLEAR_CALIBRATION == 1)  {
+    resetCalData = true;
+    if (clearTouchCalibration(calibrationData))  {
+      Serial.println("Cleared Calibration Data");      
+    }
+    else  {
+      Serial.println("Error Clearing Calibration Data");      
+    }
+  }
+#endif
+
   // Deselect Micro Chip Select
   pinMode(CS_MICRO, OUTPUT);
   digitalWrite(CS_MICRO, HIGH);    
+
+  // Set Pin mode for Touch IRQ
+  pinMode(TOUCH_IRQ, INPUT);
 
   // TFT Init
   Serial.println("Starting TFT Display");
@@ -288,6 +331,7 @@ void setup() {
   if (CONFIG_ENABLE_BL && TFT_BL >= 0)  {
     pinMode(TFT_BL, OUTPUT);
     digitalWrite(TFT_BL, HIGH);
+    Serial.printf("Setting ON Back Light on Pin:[%d]\n", TFT_BL);
   }
   myGLCD.fillScreen(TFT_BLACK);       //  fill the screen with black color
   myGLCD.setTextColor(TFT_GREEN);     //  set the text color
@@ -475,11 +519,13 @@ void setScreenBackLight(bool setON)
   if (setON)  {
     if (CONFIG_ENABLE_BL && TFT_BL >= 0)  {
       digitalWrite(TFT_BL, HIGH);
+      Serial.printf("Digital Write ON Pin [%d]\n", TFT_BL);
     }
   }
   else  {
     if (CONFIG_ENABLE_BL && TFT_BL >= 0)  {
       digitalWrite(TFT_BL, LOW);
+      Serial.printf("Digital Write OFF Pin [%d]\n", TFT_BL);
     }
     lastTouch = 0;
   }
