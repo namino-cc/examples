@@ -491,18 +491,14 @@ void loop() {
 void setScreenBackLight(bool setON)
 {
   if (setON)  {
-#if defined(CONFIG_ENABLE) and defined(TFT_BL)
     if (CONFIG_ENABLE_BL && TFT_BL >= 0)  {
       digitalWrite(TFT_BL, HIGH);
     }
-#endif
   }
   else  {
-#if defined(CONFIG_ENABLE) and defined(TFT_BL)
     if (CONFIG_ENABLE_BL && TFT_BL >= 0)  {
       digitalWrite(TFT_BL, LOW);
     }
-#endif
     lastTouch = 0;
   }
   screenON = setON;
