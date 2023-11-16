@@ -483,7 +483,7 @@ void loop() {
   printText(0,0, buf);
   Serial.print(buf);
   // Namino Status and lifetime
-  sprintf(buf, "Time:%d Last Touch:%d Elaps.:%d", secsFromBoot, lastTouch, (secsFromBoot - lastTouch));
+  sprintf(buf, "Time:%d Last Touch:%d Elaps.:%d Led:[%s]", secsFromBoot, lastTouch, (secsFromBoot - lastTouch), ledIsOn ? "ON" : "OFF");
   printText(0,60, buf);
   Serial.println(buf);
 }

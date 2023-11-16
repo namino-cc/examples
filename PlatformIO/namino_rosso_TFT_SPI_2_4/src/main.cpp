@@ -16,6 +16,7 @@
 
 // Namino Board
 #define CS_MICRO      10
+#define LED_BUILTIN             1       // Out Channel for Built-in Led
 namino_rosso nr = namino_rosso();
 bool          configANIN = true;
 bool          naminoReady = false;
@@ -300,6 +301,8 @@ void setup() {
   Serial.println(TOUCH_IRQ);
   Serial.print("CS SD Card: ");
   Serial.println(CS_SD_CARD);
+  Serial.print("Internal LED Pin: ");
+  Serial.println(LED_BUILTIN);
   Serial.println("-------------------");
   Serial.flush();
   delay(2000);
@@ -392,6 +395,7 @@ void loop() {
   uint16_t    t_x = 0, t_y = 0; // To store the touch coordinates
   bool        pressed = false;
   bool        naminoReady = false;
+  bool        ledIsOn;
 
 
   // limit loop period
@@ -414,6 +418,7 @@ void loop() {
     nr.writeRegister(WR_ANALOG_IN_CH08_CONF, ANALOG_IN_CH08_CONF_VALUES::CH08_DISABLED );
     nr.writeRegister(WR_ANALOG_OUT_CH01_CONF, ANALOG_OUT_CH01_CONF_VALUES::OUT_CH01_VOLTAGE);
     nr.writeAnalogOut(0.0); // output voltage
+    nr.writeDigOut(LED_BUILTIN, true);
     nr.writeAllRegister();
     delay(200);
     secsFromBoot = 1;
@@ -430,6 +435,8 @@ void loop() {
   }
   // Seconds from boot
   secsFromBoot = nr.readLifeTime();
+    // Read Led Status
+  ledIsOn = nr.readDigOut(LED_BUILTIN);
 
   // Loop on Color components
   // Reset color Components
@@ -501,7 +508,7 @@ void loop() {
     if (TFT_SCREEN_SAVER_SECONDS && naminoReady && lastTouch > 0 && ( (secsFromBoot - lastTouch)  > TFT_SCREEN_SAVER_SECONDS) )   {
       Serial.printf("Screen Saver Interval elapsed: %d\n", TFT_SCREEN_SAVER_SECONDS);
       setScreenBackLight(false);
-    }
+    }  
   }
 
   // Display data
@@ -509,9 +516,15 @@ void loop() {
   printText(0,0, buf);
   Serial.print(buf);
   // Namino Status and lifetime
-  sprintf(buf, "NR:%d - T:%d NR LT:%d Last T.:%d Elaps.:%d", naminoReady, (theTime / 1000), secsFromBoot, lastTouch, (secsFromBoot - lastTouch));
+  sprintf(buf, "NR:%d - T:%d NR LT:%d Last T.:%d Elaps.:%d Led:[%s]", naminoReady, (theTime / 1000), secsFromBoot, lastTouch, 
+                (secsFromBoot - lastTouch), ledIsOn ? "ON" : "OFF");
   printText(0,60, buf);
   Serial.println(buf);
+  // Reverse Led Status
+  nr.writeDigOut(LED_BUILTIN, not ledIsOn);
+  if (naminoReady)  {
+    nr.writeAllRegister();
+  }
 }
 
 void setScreenBackLight(bool setON)
