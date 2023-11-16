@@ -18,8 +18,12 @@
 #define CS_MICRO      10
 #define LED_BUILTIN             1       // Out Channel for Built-in Led
 namino_rosso nr = namino_rosso();
-bool          configANIN = true;
-bool          naminoReady = false;
+bool            configANIN = true;
+bool            naminoReady = false;
+float           tempT1 = 0.0;
+float           tempT2 = 0.0;
+float           tempT3 = 0.0;
+float           tempT4 = 0.0;
 
 // Preferences
 Preferences appPreferences;
@@ -27,19 +31,23 @@ Preferences appPreferences;
 // Touch Screen
 #define CALIBRATION_DATA    "pointercal"
 #define CALIBRATION_POINTS  5
-#define TFT_SCREEN_SAVER_SECONDS 600              // Screen Saver ON in Seconds (0=Disable Screen Saver)
-#define TOUCH_IRQ 40                              // TOUCH IRQ (Not used in Library but connected)
-TFT_eSPI myGLCD = TFT_eSPI(); // Invoke custom library
+#define TFT_SCREEN_SAVER_SECONDS 600                // Screen Saver ON in Seconds (0=Disable Screen Saver)
+#define TOUCH_IRQ 40                                // TOUCH IRQ (Not used in Library but connected)
+TFT_eSPI myGLCD = TFT_eSPI();                       // Invoke custom library
 
 // SD Card
 #define CS_SD_CARD    21
 bool          sdCardPresent = false;
 
 // Timers
-#define LOOP_PERIOD   500 // 500ms loop period
+#define LOOP_PERIOD            500                  // 500ms loop period
+#define FIELD_READ_PERIOD     4000                  // 4s interval of field read
+
 uint32_t      lastLoop = 0;
-uint32_t      lastTouch = 0;                       // Last Screen Touch in seconds from Boot
-uint32_t      secsFromBoot = 0;                    // Seconds from Namino Rosso 
+uint32_t      lastTouch = 0;                        // Last Screen Touch in seconds from Boot
+uint32_t      secsFromBoot = 0;                     // Seconds from Namino Rosso 
+uint32_t      lastFieldRead = 0;                    // Last field Read in millis()
+
 uint32_t      loopCounter = 0;
 // Color Loop Flags
 uint32_t      myColor = TFT_BLACK;
@@ -412,10 +420,8 @@ void loop() {
     // Configure analog Input (not used at the moment)  
     nr.writeRegister(WR_ANALOG_IN_CH01_CONF, ANALOG_IN_CH01_CONF_VALUES::CH01_PT1000);
     nr.writeRegister(WR_ANALOG_IN_CH03_CONF, ANALOG_IN_CH03_CONF_VALUES::CH03_PT1000);
-    nr.writeRegister(WR_ANALOG_IN_CH05_CONF, ANALOG_IN_CH05_CONF_VALUES::CH05_DISABLED );
-    nr.writeRegister(WR_ANALOG_IN_CH06_CONF, ANALOG_IN_CH06_CONF_VALUES::CH06_DISABLED );
-    nr.writeRegister(WR_ANALOG_IN_CH07_CONF, ANALOG_IN_CH07_CONF_VALUES::CH07_DISABLED );
-    nr.writeRegister(WR_ANALOG_IN_CH08_CONF, ANALOG_IN_CH08_CONF_VALUES::CH08_DISABLED );
+    nr.writeRegister(WR_ANALOG_IN_CH05_CONF, ANALOG_IN_CH05_CONF_VALUES::CH05_PT1000 );
+    nr.writeRegister(WR_ANALOG_IN_CH07_CONF, ANALOG_IN_CH07_CONF_VALUES::CH07_PT1000 );
     nr.writeRegister(WR_ANALOG_OUT_CH01_CONF, ANALOG_OUT_CH01_CONF_VALUES::OUT_CH01_VOLTAGE);
     nr.writeAnalogOut(0.0); // output voltage
     nr.writeDigOut(LED_BUILTIN, true);
@@ -510,6 +516,18 @@ void loop() {
       setScreenBackLight(false);
     }  
   }
+
+  // Read Fields Values (PT1000 Temperature Probes)
+  if (naminoReady && (theTime - lastFieldRead) >= FIELD_READ_PERIOD)   {
+    lastFieldRead = theTime;
+    tempT1 = nr.readPt1000(1);
+    tempT2 = nr.readPt1000(2);
+    tempT3 = nr.readPt1000(3);
+    tempT4 = nr.readPt1000(4);
+  }
+  sprintf(buf,"T1: %.1f T2: %.1f T3: %.1f T4: %.1f", tempT1, tempT2, tempT3, tempT4);
+  Serial.println(buf);
+  printText(0,230, buf);
 
   // Display data
   sprintf(buf, "LC: %6d BG Color: %08X R:%d G:%d B:%d ", ++loopCounter, backColor, myRed, myGreen, myBlue);
