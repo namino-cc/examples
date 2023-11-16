@@ -12,3 +12,5 @@ During the loop the state of the LED is read and the state reversed.
 Two PT1000 probes are also connected to the analog inputs, and the temperature is read by the probes by calling the readPt1000() function every 4 seconds.
 
 The example also shows how to use the RTC Chip to manage the system date and time.
+
+NB: Firmware must be version 1.007 and above (nr.fwVersion() must return 0x1007 and above)

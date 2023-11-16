@@ -24,14 +24,14 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-#include <Arduino.h>
-
-#include <namino_rosso.h>
-#include <RTClib.h>             // RTC      Library
 
 #ifdef NAMINO_ROSSO_BOARD
 #undef NAMINO_ROSSO_BOARD
 #endif
+
+#include <namino_rosso.h>
+#include <RTClib.h>             // RTC      Library
+
 
 // Namino Rosso Instance
 #define LED_BUILTIN             1       // Out Channel for Built-in Led
@@ -77,6 +77,9 @@ void setup() {
   Serial.println(SCK);
   Serial.print("SPI CS: ");
   Serial.println(SS);  
+  Serial.print("Internal LED Dig.OUT: ");
+  Serial.println(LED_BUILTIN);
+  Serial.println("-------------------");
   Serial.println();
   delay(2000);
   // RTC Setup
