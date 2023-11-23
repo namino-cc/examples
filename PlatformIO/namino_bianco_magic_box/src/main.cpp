@@ -3,6 +3,7 @@
 #undef NAMINO_BIANCO_BOARD
 #endif
 #include "namino_bianco_pins.h"			// Namino Bianco Pins definitions
+#include <Arduino.h>
 #include "main.h"
 
 #include <MFRC522.h>

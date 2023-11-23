@@ -1,12 +1,12 @@
 /*
  * info display: http://www.lcdwiki.com/2.4inch_SPI_Module_ILI9341_SKU:MSP2402
 */
-#include "main.h"
-#include "namino_rosso.h"
-
 #ifdef NAMINO_ROSSO_BOARD
 #undef NAMINO_ROSSO_BOARD
 #endif
+#include "namino_rosso.h"
+#include "main.h"
+
 
 
 // Namino Rosso Industrial Interface
@@ -76,7 +76,7 @@ bool clearTouchCalibration(uint16_t *calData)
   for (uint8_t nPoint = 0; nPoint < CALIBRATION_POINTS; nPoint++)  {
     calData[nPoint] = 0;
   }
-  appPreferences.begin(CALIBRATION_DATA, true);
+  appPreferences.begin(CALIBRATION_DATA, false);
   cleared = appPreferences.clear();
   appPreferences.end();
   return cleared;
@@ -294,7 +294,7 @@ void setup() {
   Serial.println(mbNodeID);
   Serial.println("-------------------");
   // Clear Calibration if required
-#ifdef CLEAR_CALIBRATION
+#if defined(CLEAR_CALIBRATION)
   if (CLEAR_CALIBRATION == 1)  {
     resetCalData = true;
     if (clearTouchCalibration(calibrationData))  {
@@ -315,11 +315,14 @@ void setup() {
   Serial.println("Starting TFT Display");
   myGLCD.init();
   myGLCD.setRotation(1);
+
+#if defined(CONFIG_ENABLE) and defined(TFT_BL)
   if (CONFIG_ENABLE_BL && TFT_BL >= 0)  {
     pinMode(TFT_BL, OUTPUT);
     digitalWrite(TFT_BL, HIGH);
   }
-  
+#endif
+
   // Calibrate the touch screen and retrieve the scaling factors
   Serial.println("Retrieving Calibration Data");
   if (not resetCalData && readTouchCalibration(calibrationData))  {
@@ -402,8 +405,9 @@ void setup() {
   nr.begin(800000U, MISO, MOSI, SCK, SS);
   delay(2000);
   Serial.println("Namino Rosso Init Done");
-  // Opening Modbus Interface
-  initMB();
+
+  // Opening Modbus Interface as last operation
+  // initMB();
 }
 
 void loop() {
@@ -512,7 +516,7 @@ void loop() {
       Serial.println(buf);
       printText(0, 135, buf);
       // debug function
-      // nr.showRegister();    
+      nr.showRegister();    
     }
   }
 
@@ -544,6 +548,7 @@ void setScreenBackLight(bool setON)
 
 void initMB()
 {
+  // Modbus is connected to Serial1 
   Serial1.begin(NAMINO_MODBUS_BAUD, SERIAL_8N1, NAMINO_MODBUS_RX, NAMINO_MODBUS_TX);
   Serial1.setRxBufferSize(2048);
   Serial1.setTxBufferSize(2048);

@@ -3,6 +3,7 @@
 //---------------------------------------
 // Purpose of this Project: Show how to use **Robot D1 LCD Keypad Shield** with *Namino Boards*.  
 // See ReadMe.md for details
+// The example can be adapted to any Namino board version because the Namino libraries are not used
 //---------------------------------------
 
 #include <Arduino.h>
@@ -51,7 +52,25 @@ void setup() {
   // Serial Setup
   Serial.begin(115200);
   while (!Serial);
-  Serial.println("Serial Port Started");
+  Serial.println("");
+  Serial.println("=====================================");
+  Serial.println("##   GENERIC  NAMINO  LCD  EXAMPLE ##");
+  Serial.println("=====================================");
+  Serial.print("DISPLAY RST: ");
+  Serial.println(RS);  
+  Serial.print("DISPLAY Enable: ");
+  Serial.println(Enable);  
+  Serial.print("DISPLAY D4: ");
+  Serial.println(D4);  
+  Serial.print("DISPLAY D5: ");
+  Serial.println(D5);  
+  Serial.print("DISPLAY D6: ");
+  Serial.println(D6);  
+  Serial.print("DISPLAY D7: ");
+  Serial.println(D7);  
+  Serial.print("DISPLAY BACKLIGHT: ");
+  Serial.println(BL);  
+  Serial.println("-------------------");
   // Set lcd Pins as Output
   pinMode(RS, OUTPUT);
   pinMode(Enable, OUTPUT);

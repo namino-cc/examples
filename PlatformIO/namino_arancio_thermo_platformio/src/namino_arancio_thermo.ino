@@ -23,14 +23,13 @@ SOFTWARE.
 
 /* NB, use profile: adafruit_feather_esp32s3_reversetft */
 
-#include <Arduino.h>
-#include <SPI.h>
-
-#include "./namino_arancio.h"
-
 #ifdef NAMINO_ARANCIO_BOARD
 #undef NAMINO_ARANCIO_BOARD
 #endif
+
+
+#include "namino_arancio.h"
+
 
 namino_arancio na = namino_arancio();
 uint16_t loopNr = 1;

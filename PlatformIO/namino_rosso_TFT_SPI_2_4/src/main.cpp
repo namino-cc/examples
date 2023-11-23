@@ -1,16 +1,15 @@
 /*
  * info display: http://www.lcdwiki.com/2.4inch_SPI_Module_ILI9341_SKU:MSP2402
 */
-#include <Arduino.h>
-#include <SPI.h>
-#include <Preferences.h>
-#include <SD.h>
-
-#include "namino_rosso.h"
-
 #ifdef NAMINO_ROSSO_BOARD
 #undef NAMINO_ROSSO_BOARD
 #endif
+
+#include "namino_rosso.h"
+
+#include <Preferences.h>
+#include <SD.h>
+
 
 #include <TFT_eSPI.h>      // Hardware-specific library
 

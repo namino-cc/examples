@@ -2,6 +2,7 @@
 // Project **namino_RTC_LCD_Keypad_Shield**
 //---------------------------------------
 // Purpose of this Project: Show how to use **Robot D1 LCD Keypad Shield** with *Namino Boards* and internal DS1307 RTC via I2C.  
+// The example can be adapted to any Namino board version because the Namino libraries are not used
 // See ReadMe.md for details
 //---------------------------------------
 

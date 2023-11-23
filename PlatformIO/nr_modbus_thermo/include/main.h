@@ -1,15 +1,12 @@
 #ifndef MAIN_H
 #define MAIN_H
-#include <Arduino.h>
-#include <SPI.h>                // SPI      Library
+
 #include <Preferences.h>        // Preference Settings Library
 #include <SD.h>                 // SD       Library
 #include <RTClib.h>             // RTC      Library
 #include <TFT_eSPI.h>           // TFT      Library
 #include <Adafruit_SHT4x.h>     // SHT4x    Library
 #include <ModbusRTU.h>
-
-
 
 
 #define NAMINO_I2C_SCL         0 

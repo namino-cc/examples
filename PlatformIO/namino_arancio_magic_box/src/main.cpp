@@ -2,9 +2,6 @@
 #include <Wire.h>
 #include <MFRC522.h>
 
-#ifdef NAMINO_ROSSO_BOARD
-#undef NAMINO_ROSSO_BOARD
-#endif
 
 #include "main.h"
 
