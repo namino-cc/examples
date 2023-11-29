@@ -48,6 +48,11 @@ float         roomTemperature = 0.0;
 float         roomHumidity = 0.0;
 float         externalTemperature = 0.0;
 float         heaterTemperature = 0.0;
+float         tempT1 = 0.0;
+float         tempT2 = 0.0;
+float         tempT3 = 0.0;
+float         tempT4 = 0.0;
+
 
 bool readTouchCalibration(uint16_t *calData)
 {
@@ -79,7 +84,8 @@ bool clearTouchCalibration(uint16_t *calData)
   appPreferences.begin(CALIBRATION_DATA, false);
   cleared = appPreferences.clear();
   appPreferences.end();
-  return cleared;
+   // Write all Zeros to nameSpace
+  return writeTouchCalibration(calData);
 }
 
 bool writeTouchCalibration(uint16_t *calData)
@@ -284,6 +290,12 @@ void setup() {
   Serial.println(CONFIG_ENABLE_BL);
   Serial.print("TFT_SCREEN SAVER SEC: ");
   Serial.println(TFT_SCREEN_SAVER_SECONDS);
+  Serial.print("TFT_TOUCH IRQ: ");
+  Serial.println(TOUCH_IRQ);
+  Serial.print("CS SD Card: ");
+  Serial.println(CS_SD_CARD);
+  Serial.print("Internal LED Pin: ");
+  Serial.println(LED_BUILTIN);
   Serial.print("NAMINO_I2C_SCL: ");
   Serial.println(NAMINO_I2C_SCL);
   Serial.print("NAMINO_I2C_SDA: ");
@@ -293,6 +305,9 @@ void setup() {
   Serial.print("Modbus RTU Node ID: ");
   Serial.println(mbNodeID);
   Serial.println("-------------------");
+  Serial.flush();
+  delay(2000);
+
   // Clear Calibration if required
 #if defined(CLEAR_CALIBRATION)
   if (CLEAR_CALIBRATION == 1)  {
@@ -305,23 +320,26 @@ void setup() {
     }
   }
 #endif
-  Serial.flush();
-  delay(2000);
 
   // Deselect Micro Chip Select
   pinMode(CS_MICRO, OUTPUT);
   digitalWrite(CS_MICRO, HIGH);    
 
+  // Set Pin mode for Touch IRQ
+  pinMode(TOUCH_IRQ, INPUT);
+
   Serial.println("Starting TFT Display");
   myGLCD.init();
   myGLCD.setRotation(1);
 
-#if defined(CONFIG_ENABLE) and defined(TFT_BL)
+  // Screen Back Light ON
   if (CONFIG_ENABLE_BL && TFT_BL >= 0)  {
     pinMode(TFT_BL, OUTPUT);
     digitalWrite(TFT_BL, HIGH);
+    Serial.printf("Setting ON Back Light on Pin:[%d]\n", TFT_BL);
   }
-#endif
+  myGLCD.fillScreen(TFT_BLACK);       //  fill the screen with black color
+  myGLCD.setTextColor(TFT_GREEN);     //  set the text color
 
   // Calibrate the touch screen and retrieve the scaling factors
   Serial.println("Retrieving Calibration Data");
@@ -415,6 +433,7 @@ void loop() {
   uint32_t    theTime = millis();
   uint16_t    t_x = 0, t_y = 0; // To store the touch coordinates
   bool        pressed = false;
+  bool        ledIsOn;
   sensors_event_t humidity, temp;
 
 
@@ -433,12 +452,11 @@ void loop() {
     // Configure analog Input (not used at the moment)  
     nr.writeRegister(WR_ANALOG_IN_CH01_CONF, ANALOG_IN_CH01_CONF_VALUES::CH01_PT1000);
     nr.writeRegister(WR_ANALOG_IN_CH03_CONF, ANALOG_IN_CH03_CONF_VALUES::CH03_PT1000);
-    nr.writeRegister(WR_ANALOG_IN_CH05_CONF, ANALOG_IN_CH05_CONF_VALUES::CH05_DISABLED );
-    nr.writeRegister(WR_ANALOG_IN_CH06_CONF, ANALOG_IN_CH06_CONF_VALUES::CH06_DISABLED );
-    nr.writeRegister(WR_ANALOG_IN_CH07_CONF, ANALOG_IN_CH07_CONF_VALUES::CH07_DISABLED );
-    nr.writeRegister(WR_ANALOG_IN_CH08_CONF, ANALOG_IN_CH08_CONF_VALUES::CH08_DISABLED );
+    nr.writeRegister(WR_ANALOG_IN_CH05_CONF, ANALOG_IN_CH05_CONF_VALUES::CH05_PT1000 );
+    nr.writeRegister(WR_ANALOG_IN_CH07_CONF, ANALOG_IN_CH07_CONF_VALUES::CH07_PT1000 );
     nr.writeRegister(WR_ANALOG_OUT_CH01_CONF, ANALOG_OUT_CH01_CONF_VALUES::OUT_CH01_VOLTAGE);
     nr.writeAnalogOut(0.0); // output voltage
+    nr.writeDigOut(LED_BUILTIN, true);
     nr.writeAllRegister();
     delay(200);
     secsFromBoot = 1;
@@ -455,18 +473,21 @@ void loop() {
   }
   // Seconds from boot
   secsFromBoot = nr.readLifeTime();
+  // Read Led Status
+  ledIsOn = nr.readDigOut(LED_BUILTIN);
 
   // Touch Screen
   // Pressed will be set true is there is a valid touch on the screen
   pressed = myGLCD.getTouch(&t_x, &t_y);
   // Draw a white spot at the detected coordinates
   if (pressed) {
+    // Switch back on BlackLight
+    setScreenBackLight(true);
+  // Draw a white spot at the detected coordinates
     // myGLCD.fillCircle(t_x, t_y, 2, TFT_WHITE);
     sprintf(buf, "Pressed @:X:%d - Y:%d", t_x, t_y);
     printText(0,230, buf);
-    Serial.println(buf);
-    // Switch back on BlackLight
-    setScreenBackLight(true);
+    lastTouch = secsFromBoot;
     // delay(200);
   }
   else  {
@@ -475,10 +496,10 @@ void loop() {
       Serial.printf("Screen Saver Interval elapsed: %d\n", TFT_SCREEN_SAVER_SECONDS);
       setScreenBackLight(false);
     }
-    // Clear last touch position
-    if (lastTouch > 0)  {
-      myGLCD.fillRect(0, 230, TFT_HEIGHT, TFT_WIDTH - 230, TFT_BLACK);
-    }
+  // Clear last touch position
+  if (lastTouch > 0)  {
+    myGLCD.fillRect(0, 230, TFT_HEIGHT, TFT_WIDTH - 230, TFT_BLACK);
+  }
   }
 
   // Read RTC every second
@@ -510,16 +531,22 @@ void loop() {
       roomHumidity = humidity.relative_humidity;
     }
     if (naminoReady)  {
-      externalTemperature = nr.readPt1000(1);
-      heaterTemperature = nr.readPt1000(2);
+      tempT1 = nr.readPt1000(1);
+      tempT2 = nr.readPt1000(2);
+      tempT3 = nr.readPt1000(3);
+      tempT4 = nr.readPt1000(4);
+      externalTemperature = tempT1;
+      heaterTemperature = tempT2;
       sprintf(buf,"External Temperature: %.1f Heater Temperature: %.1f", externalTemperature, heaterTemperature);
       Serial.println(buf);
       printText(0, 135, buf);
       // debug function
-      nr.showRegister();    
+      // nr.showRegister();    
     }
   }
 
+  // Reverse Led Status
+  nr.writeDigOut(LED_BUILTIN, not ledIsOn);
   // Update Industrial Registers
   if (naminoReady && secsFromBoot)  {
     nr.writeAllRegister();
@@ -532,12 +559,14 @@ void setScreenBackLight(bool setON)
   if (setON)  {
     if (CONFIG_ENABLE_BL && TFT_BL >= 0)  {
       digitalWrite(TFT_BL, HIGH);
+      Serial.printf("Digital Write ON Pin [%d]\n", TFT_BL);
     }
     lastTouch = secsFromBoot;
   }
   else  {
     if (CONFIG_ENABLE_BL && TFT_BL >= 0)  {
       digitalWrite(TFT_BL, LOW);
+      Serial.printf("Digital Write OFF Pin [%d]\n", TFT_BL);
     }
     lastTouch = 0;
   }

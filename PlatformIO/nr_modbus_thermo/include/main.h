@@ -16,10 +16,12 @@
 #define TIME_PERIOD         1000            // Read period of RTC
 #define FIELD_READ_PERIOD   4000            // 4s interval of field read
 
-#define TFT_SCREEN_SAVER_SECONDS 60         // Screen Saver ON in Seconds
+#define TFT_SCREEN_SAVER_SECONDS 600        // Screen Saver ON in Seconds
+#define TOUCH_IRQ 40                        // TOUCH IRQ (Not used in Library but Connected to pin 
+#define LED_BUILTIN             1           // Out Channel for Built-in Led
 
 #define CS_MICRO      10
-#define CS_SD_CARD    14
+#define CS_SD_CARD    21
 
 #define CALIBRATION_DATA    "pointercal"
 #define CALIBRATION_POINTS  5
@@ -33,6 +35,13 @@
 
 
 // Function Protos
+// Functions Protos
+void setScreenBackLight(bool setON);
+bool readTouchCalibration(uint16_t *calData);
+bool clearTouchCalibration(uint16_t *calData);
+bool writeTouchCalibration(uint16_t *calData);
+void printText(int , int , String , uint8_t, uint8_t , uint8_t);
+void touch_calibrate();
 void setScreenBackLight(bool);
 void initMB();
 #endif // MAIN_H
