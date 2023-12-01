@@ -9,7 +9,7 @@
 #include <Arduino.h>
 #include <LiquidCrystal.h>
 
-#define BLINK_ON    5000            // seconds of cursor blink
+#define BLINK_ON    15000           // seconds of cursor blink
 #define LOOP_PERIOD   200           // 200ms loop period
 
 // Define LCD Control Pins: LiquidCrystal uses pins D4-D9 to control Keypad board
@@ -51,7 +51,7 @@ void setup() {
   // put your setup code here, to run once:
   // Serial Setup
   Serial.begin(115200);
-  while (!Serial);
+  delay(2000);
   Serial.println("");
   Serial.println("=====================================");
   Serial.println("##   GENERIC  NAMINO  LCD  EXAMPLE ##");

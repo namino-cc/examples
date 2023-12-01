@@ -10,9 +10,9 @@
 #define NAMINO_I2C_SDA   1
 
 #define LOOP_PERIOD   200           // 200ms loop period
-#define SCREEN_ON    8000           //  s of screen on time
+#define SCREEN_ON   15000           //  s of screen on time
 #define TIME_PERIOD  1000           // Read period of RTC
-#define BLINK_ON    5000            // seconds of cursor blink
+#define BLINK_ON     5000           // seconds of cursor blink
 
 // Function Protos
 void setBackLight(bool mode);

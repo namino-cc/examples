@@ -49,7 +49,7 @@ void setup() {
   // put your setup code here, to run once:
   // Serial Setup
   Serial.begin(115200);
-  while (!Serial);
+  delay(2000);
   Serial.println("Serial Port Started");
   // Set lcd Pins as Output
   pinMode(RS, OUTPUT);
