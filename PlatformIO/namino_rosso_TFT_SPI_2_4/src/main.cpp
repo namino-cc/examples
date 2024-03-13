@@ -10,7 +10,13 @@
 #include <Preferences.h>
 #include <SD.h>
 
-
+// info issues #4792 #5154
+#define ST7789_DRIVER   0
+#define TFT_WIDTH       240
+#define TFT_HEIGHT      320
+// define for enable touch cal
+// #define REQUIRE_TOUCH_CALIBRATION
+// 
 #include <TFT_eSPI.h>      // Hardware-specific library
 
 // Namino Board
@@ -32,7 +38,7 @@ Preferences appPreferences;
 #define CALIBRATION_POINTS  5
 #define TFT_SCREEN_SAVER_SECONDS 600                // Screen Saver ON in Seconds (0=Disable Screen Saver)
 #define TOUCH_IRQ 40                                // TOUCH IRQ (Not used in Library but connected)
-TFT_eSPI myGLCD = TFT_eSPI();                       // Invoke custom library
+TFT_eSPI myGLCD = TFT_eSPI(TFT_HEIGHT, TFT_WIDTH);  // Invoke custom library, notes: portrait display
 
 // SD Card
 #define CS_SD_CARD    21
@@ -347,14 +353,16 @@ void setup() {
   myGLCD.setTextColor(TFT_GREEN);     //  set the text color
   
   // Calibrate the touch screen and retrieve the scaling factors
-  Serial.println("Retrieving Calibration Data");
-  if (readTouchCalibration(calibrationData))  {
-    myGLCD.setTouch(calibrationData);
-    Serial.println("TFT Calibration Data applied");
-  }
-  else  {
-    touch_calibrate();
-  }
+  #if defined(REQUIRE_TOUCH_CALIBRATION)
+    Serial.println("Retrieving Calibration Data");
+    if (readTouchCalibration(calibrationData))  {
+      myGLCD.setTouch(calibrationData);
+      Serial.println("TFT Calibration Data applied");
+    }
+    else  {
+      touch_calibrate();
+    }
+  #endif
   Serial.println("Display Init Done");
 
   // SD Card
@@ -526,16 +534,16 @@ void loop() {
   }
   sprintf(buf,"T1: %.1f T2: %.1f T3: %.1f T4: %.1f", tempT1, tempT2, tempT3, tempT4);
   Serial.println(buf);
-  printText(0,230, buf);
+  printText(0, 230, buf, 2);
 
   // Display data
-  sprintf(buf, "LC: %6d BG Color: %08X R:%d G:%d B:%d ", ++loopCounter, backColor, myRed, myGreen, myBlue);
-  printText(0,0, buf);
+  sprintf(buf, "LC:%6d BG COL:%08X R:%d G:%d B:%d ", ++loopCounter, backColor, myRed, myGreen, myBlue);
+  printText(0, 0, buf, 4);
   Serial.print(buf);
   // Namino Status and lifetime
   sprintf(buf, "NR:%d - T:%d NR LT:%d Last T.:%d Elaps.:%d Led:[%s]", naminoReady, (theTime / 1000), secsFromBoot, lastTouch, 
                 (secsFromBoot - lastTouch), ledIsOn ? "ON" : "OFF");
-  printText(0,60, buf);
+  printText(0, 100, buf, 2);
   Serial.println(buf);
   // Reverse Led Status
   nr.writeDigOut(LED_BUILTIN, not ledIsOn);
