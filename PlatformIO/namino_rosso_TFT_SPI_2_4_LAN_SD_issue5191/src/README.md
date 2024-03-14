@@ -1,0 +1,1 @@
+refers to a test board that has an SPI bus with multiple devices, ESP32-S3 - TFT - LAN - SD card. Attached is the library to consolidate with MELD, modified in the code
