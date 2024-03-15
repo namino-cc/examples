@@ -671,13 +671,15 @@ void bmpDraw(const char *filename, int x, int y) {
 
 COROUTINE(photoAlbum) {
   COROUTINE_LOOP() {
-    COROUTINE_DELAY(6000);
+    COROUTINE_DELAY(5000);
+    bmpDraw("/test_1.bmp", 0, 0);
+    COROUTINE_DELAY(5000);
     bmpDraw("/1.bmp", 0, 0);
-    COROUTINE_DELAY(6000);
+    COROUTINE_DELAY(5000);
     bmpDraw("/2.bmp", 0, 0);
-    COROUTINE_DELAY(6000);
+    COROUTINE_DELAY(5000);
     bmpDraw("/3.bmp", 0, 0);
-    COROUTINE_DELAY(6000);
+    COROUTINE_DELAY(5000);
     bmpDraw("/4.bmp", 0, 0);
   }
 }
