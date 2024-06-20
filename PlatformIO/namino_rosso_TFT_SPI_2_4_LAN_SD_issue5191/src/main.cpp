@@ -45,6 +45,9 @@ TFT_eSPI myGLCD = TFT_eSPI(TFT_HEIGHT, TFT_WIDTH);  // Invoke custom library, no
 #define CS_SD_CARD    21
 bool          sdCardPresent = false;
 
+#include "TxtDisp.h"
+TxtDisp txt_disp = TxtDisp();
+
 // LAN 5500 for ESP32
 #include <SPI.h>
 #include <Ethernet2.h>
